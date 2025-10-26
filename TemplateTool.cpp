@@ -3,6 +3,7 @@
 #include <map>
 #include <unordered_map>
 #include "BCFUtils.hpp"
+#include "BCFReader.hpp"
 int main() {
     std::vector<BlockGroup> sub0, sub1;
 
@@ -33,10 +34,24 @@ int main() {
 
     // 写文件
     BCFUtils::writeBCF("1.bcf", subChunks, paletteList, typeMap, stateMap);
+    std::map<BlockTypeID, std::string> typeMap1{};
+    std::map<BlockStateID, std::string> stateMap1{};
 
-    // 读文件
-    auto readSubChunks = BCFUtils::readAllSubChunks("1.bcf");
-    for (size_t i = 0; i < readSubChunks.size(); i++) {
-        std::cout << "SubChunk " << i << " has " << readSubChunks[i].size() << " BlockGroups\n";
+    BCFReader reader("1.bcf");
+    for (size_t i = 0; i < reader.getSubChunkCount(); i++)
+    {
+        auto subChunk = reader.getBlocks(i);
+        for (auto& bg : subChunk) {
+            if(bg.states.empty())
+                std::cout << "Block: " << bg.type << " " << bg.x << " " << bg.y << " " << bg.z << " " << "\n";
+            for (auto& block : bg.states) {
+                std::cout << "Block: " << bg.type << " " << bg.x << " " << bg.y << " " << bg.z << " " << block.first << ": " << block.second << "\n";
+                }
+        }
     }
+    // 读文件
+    //auto readSubChunks = BCFUtils::readAllSubChunks("1.bcf");
+    //for (size_t i = 0; i < readSubChunks.size(); i++) {
+    //    std::cout << "SubChunk " << i << " has " << readSubChunks[i].size() << " BlockGroups\n";
+    //}
 }

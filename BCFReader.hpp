@@ -7,10 +7,7 @@
 #include "SubChunkUtils.hpp"
 class BCFReader {
 public:
-    BCFReader(const std::string& filename,
-        const std::map<BlockTypeID, std::string>& typeMap,
-        const std::map<BlockStateID, std::string>& stateMap)
-        : typeMap(typeMap), stateMap(stateMap)
+    BCFReader(const std::string& filename) 
     {
         std::ifstream ifs(filename, std::ios::binary);
         if (!ifs) throw std::runtime_error("Failed to open file");
@@ -19,7 +16,7 @@ public:
         read_le<BCFHeader>(ifs, header);
 
         // 读取子区块
-        ifs.seekg(sizeof(BCFHeader), std::ios::beg); // 假设 header 后是子区块
+        ifs.seekg(sizeof(BCFHeader), std::ios::beg); // header 后是 subChunks
         for (size_t i = 0; i < header.subChunkCount; i++) {
             SubChunkSize sz; Coord oy;
             subChunks.push_back(SubChunkUtils::readSubChunk(ifs, sz, oy));
@@ -42,7 +39,27 @@ public:
             }
             paletteList.push_back(pk);
         }
+
+        // 读取方块类型映射
+        ifs.seekg(header.blockTypeMapOffset, std::ios::beg);
+        uint32_t typeCount = read_u32(ifs);
+        for (uint32_t i = 0; i < typeCount; i++) {
+            BlockTypeID id = read_u16(ifs);
+            std::string name = readString16(ifs);
+            typeMap[id] = name;
+        }
+
+        // 读取状态名称映射
+        ifs.seekg(header.stateNameMapOffset, std::ios::beg);
+        uint32_t stateCount = read_u32(ifs);
+        for (uint32_t i = 0; i < stateCount; i++) {
+            BlockStateID id = read_u8(ifs);
+            std::string name = readString16(ifs);
+            stateMap[id] = name;
+        }
     }
+
+
 
     // 获取指定子区块的所有方块信息（字符串化）
     std::vector<BlockInfo> getBlocks(size_t subChunkIndex) {
@@ -59,7 +76,7 @@ public:
                 bi.type = typeStr;
                 for (auto& s : pk.states) {
                     std::string stateName = stateMap.at(s.first);
-                    bi.states.push_back({ stateName,s.second });
+                    bi.states.push_back({ stateName,std::to_string(s.second) });
                 }
                 result.push_back(bi);
             }
@@ -73,6 +90,6 @@ private:
     BCFHeader header;
     std::vector<std::vector<BlockGroup>> subChunks;
     std::vector<PaletteKey> paletteList;
-    const std::map<BlockTypeID, std::string>& typeMap;
-    const std::map<BlockStateID, std::string>& stateMap;
+     std::map<BlockTypeID, std::string> typeMap;
+     std::map<BlockStateID, std::string> stateMap;
 };

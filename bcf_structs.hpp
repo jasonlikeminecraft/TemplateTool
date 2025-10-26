@@ -79,6 +79,6 @@ struct PaletteKeyHash {
 struct BlockInfo {
     Coord x, y, z;
     std::string type;                     // 类型字符串
-    std::vector<std::pair<std::string, int>> states; // <状态名,状态值>
+    std::vector<std::pair<std::string, std::string>> states; // <状态名,状态值>
 };
 #pragma pack(pop)

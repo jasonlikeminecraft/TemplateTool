@@ -33,4 +33,21 @@ struct SubChunkUtils {
         }
         return groups;
     }
+
+    static PaletteID getPaletteId(
+        const std::vector<BlockGroup>& groups,
+        int x, int y, int z)
+    {
+        for (const auto& group : groups) {
+            for (size_t i = 0; i < group.count; i++) {
+                if (group.x[i] == x &&
+                    group.y[i] == y &&
+                    group.z[i] == z) {
+                    return group.paletteId;
+                }
+            }
+        }
+
+        return static_cast<PaletteID>(-1); // Î´ÕÒµ½, ¿ÕÆø or Î´´æ´¢
+    }
 };

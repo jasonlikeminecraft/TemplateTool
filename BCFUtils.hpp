@@ -7,6 +7,14 @@
 #include <fstream>
 struct BCFUtils {
 
+    private:
+        std::vector<std::vector<BlockGroup>> subChunks;
+        std::vector<PaletteKey> palette;
+        std::map<BlockTypeID, std::string> typeMap;
+        std::map<BlockStateID, std::string> stateMap;
+
+public:
+
     // 写整个 BCF 文件
     static void writeBCF(const std::string& path, const std::vector<std::vector<BlockGroup>>& subChunks,
         const std::vector<PaletteKey>& paletteList,
@@ -104,4 +112,56 @@ struct BCFUtils {
 
         return paletteList;
     }
+
+
+    inline uint32_t getSubChunkIndex(int y) {
+        return y / 16;
+    }
+
+    inline uint32_t getLocalY(int y) {
+        return y % 16;
+    }
+    inline int fetchPaletteId(int x, int y, int z) {
+        uint32_t scId = getSubChunkIndex(y);
+        if (scId >= subChunks.size()) return -1;
+        return SubChunkUtils::getPaletteId(subChunks[scId], x, getLocalY(y), z);
+    }
+
+    std::string getBlockType(int x, int y, int z) {
+        int pid = fetchPaletteId(x, y, z);
+        if (pid < 0) return "minecraft:air";
+
+        const auto& key = palette[pid];
+        if (!typeMap.count(key.typeId)) return "minecraft:air";
+
+        return typeMap.at(key.typeId);
+    }
+
+    std::map<std::string, std::string>
+        getBlockState(int x, int y, int z) {
+        std::map<std::string, std::string> result;
+
+        int pid = fetchPaletteId(x, y, z);
+        if (pid < 0) return result;
+
+        const auto& key = palette[pid];
+
+        for (auto& kv : key.states) {
+            uint8_t stateId = kv.first;
+            uint8_t stateVal = kv.second;
+
+            if (stateMap.count(stateId)) {
+                result[stateMap.at(stateId)] = std::to_string(stateVal);
+            }
+        }
+        return result;
+    }
+
+    //BlockInfo getBlock(int x, int y, int z) {
+    //    BlockInfo info;
+    //    info.type = getBlockType(x, y, z);
+    //    info.states = getBlockState(x, y, z);
+    //    return info;
+    //}
+
 };
