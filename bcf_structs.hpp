@@ -11,9 +11,10 @@ using BlockCount = uint32_t;   // 方块数量
 using Coord = int16_t;    // 坐标 x/y/z 范围 -32767~32767
 using BlockTypeID = uint16_t;   // 方块类型 ID
 using BlockStateID = uint8_t;    // 方块状态 ID
+using StateValue = uint8_t;    // 状态值
 using Version = uint8_t;    // 文件版本号
 
-using StatePair = std::pair<BlockStateID, BlockStateID>;
+using StatePair = std::pair<BlockStateID, StateValue>;
 #pragma pack(push,1)
 // -------------------- 文件头 --------------------
 struct BCFHeader {
