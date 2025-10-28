@@ -3,49 +3,52 @@
 #include <vector>
 #include <string>
 
-// -------------------- ÀàĞÍ±ğÃû --------------------
-using FilePos = uint64_t;   // ÎÄ¼şÆ«ÒÆÁ¿»ò´óĞ¡
-using SubChunkSize = uint64_t;   // ×ÓÇø¿é´óĞ¡
+// -------------------- ç±»å‹åˆ«å --------------------
+using FilePos = uint64_t;   // æ–‡ä»¶åç§»é‡æˆ–å¤§å°
+using SubChunkSize = uint64_t;   // å­åŒºå—å¤§å°
 using PaletteID = uint32_t;   // paletteId
-using BlockCount = uint32_t;   // ·½¿éÊıÁ¿
-using Coord = int16_t;    // ×ø±ê x/y/z ·¶Î§ -32767~32767
-using BlockTypeID = uint16_t;   // ·½¿éÀàĞÍ ID
-using BlockStateID = uint8_t;    // ·½¿é×´Ì¬ ID
-using StateValue = uint8_t;    // ×´Ì¬Öµ
-using Version = uint8_t;    // ÎÄ¼ş°æ±¾ºÅ
+using BlockCount = uint32_t;   // æ–¹å—æ•°é‡
+using Coord = int16_t;    // åæ ‡ x/y/z èŒƒå›´ -32767~32767
+using BlockTypeID = uint16_t;   // æ–¹å—ç±»å‹ ID
+using BlockStateID = uint8_t;    // æ–¹å—çŠ¶æ€ ID
+using StateValue = uint8_t;    // çŠ¶æ€å€¼
+using Version = uint8_t;    // æ–‡ä»¶ç‰ˆæœ¬å·
 
 using StatePair = std::pair<BlockStateID, StateValue>;
 #pragma pack(push,1)
-// -------------------- ÎÄ¼şÍ· --------------------
-struct BCFHeader {
-    char magic[3];           // "BCF"
-    Version version;
-    uint16_t width, length, height;
-    uint8_t subChunkBaseSize;
-    FilePos subChunkCount;
-    FilePos paletteOffset;
-    FilePos blockTypeMapOffset;
-    FilePos stateNameMapOffset;
+// -------------------- æ–‡ä»¶å¤´ --------------------
 
-    BCFHeader()
-        : version(1), width(64), length(64), height(64),
-        subChunkBaseSize(16), subChunkCount(0),
-        paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0)
-    {
-        magic[0] = 'B'; magic[1] = 'C'; magic[2] = 'F';
-    }
+struct BCFHeader {  
+    char magic[3];           // "BCF"  
+    Version version;         // ç‰ˆæœ¬ 2 æ”¯æŒåç§»é‡è¡¨  
+    uint16_t width, length, height;  
+    uint8_t subChunkBaseSize;  
+    FilePos subChunkCount;  
+    FilePos subChunkOffsetsTableOffset;  // æ–°å¢:å­åŒºå—åç§»é‡è¡¨ä½ç½®  
+    FilePos paletteOffset;  
+    FilePos blockTypeMapOffset;  
+    FilePos stateNameMapOffset;  
+  
+    BCFHeader()  
+        : version(2), width(64), length(64), height(64),  // ç‰ˆæœ¬æ”¹ä¸º 2  
+        subChunkBaseSize(16), subChunkCount(0),  
+        subChunkOffsetsTableOffset(0),  // æ–°å¢å­—æ®µ  
+        paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0)  
+    {  
+        magic[0] = 'B'; magic[1] = 'C'; magic[2] = 'F';  
+    }  
 };
 
-// -------------------- ×ÓÇø¿éÍ· --------------------
+// -------------------- å­åŒºå—å¤´ --------------------
 struct SubChunkHeader {
-    SubChunkSize subChunkSize;   // ×ÓÇø¿é×Ö½ÚÊı
+    SubChunkSize subChunkSize;   // å­åŒºå—å­—èŠ‚æ•°
     Coord originY;
     BlockCount blockGroupCount;
 
     SubChunkHeader() : subChunkSize(0), originY(0), blockGroupCount(0) {}
 };
 
-// -------------------- Í¬Àà·½¿é×é --------------------
+// -------------------- åŒç±»æ–¹å—ç»„ --------------------
 struct BlockGroup {
     PaletteID paletteId;
     BlockCount count;
@@ -65,7 +68,7 @@ struct PaletteKey {
     }
 };
 
-// PaletteKey ¹şÏ£
+// PaletteKey å“ˆå¸Œ
 struct PaletteKeyHash {
     size_t operator()(const PaletteKey& k) const noexcept {
         size_t h = k.typeId;
@@ -79,7 +82,7 @@ struct PaletteKeyHash {
 
 struct BlockInfo {
     Coord x, y, z;
-    std::string type;                     // ÀàĞÍ×Ö·û´®
-    std::vector<std::pair<std::string, std::string>> states; // <×´Ì¬Ãû,×´Ì¬Öµ>
+    std::string type;                     // ç±»å‹å­—ç¬¦ä¸²
+    std::vector<std::pair<std::string, std::string>> states; // <çŠ¶æ€å,çŠ¶æ€å€¼>
 };
 #pragma pack(pop)
