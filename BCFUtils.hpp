@@ -15,48 +15,58 @@ struct BCFUtils {
 
 public:
 
-    // Ğ´Õû¸ö BCF ÎÄ¼ş
-    static void writeBCF(const std::string& path, const std::vector<std::vector<BlockGroup>>& subChunks,
-        const std::vector<PaletteKey>& paletteList,
-        const std::map<BlockTypeID, std::string>& typeMap,
-        const std::map<BlockStateID, std::string>& stateMap)
-    {
-        std::ofstream ofs(path, std::ios::binary);
-        BCFHeader header;
-        write_le<BCFHeader>(ofs, header);
-
-        for (size_t i = 0; i < subChunks.size(); i++) {
-            Coord originY = static_cast<Coord>(i * 16);
-            SubChunkUtils::writeSubChunk(ofs, subChunks[i], originY);
-        }
-
-        // Ğ´ Palette Ó³Éä
-        header.paletteOffset = ofs.tellp();
-        write_u32(ofs, paletteList.size());
-        for (size_t pid = 0; pid < paletteList.size(); pid++) {
-            const auto& k = paletteList[pid];
-            write_u32(ofs, static_cast<uint32_t>(pid));
-            write_u16(ofs, k.typeId);
-            write_u16(ofs, k.states.size());
-            for (auto& s : k.states) { write_u8(ofs, s.first); write_u8(ofs, s.second); }
-        }
-
-        // Ğ´·½¿éÀàĞÍÓ³Éä
-        header.blockTypeMapOffset = ofs.tellp();
-        write_u32(ofs, typeMap.size());
-        for (auto& kv : typeMap) { write_u16(ofs, kv.first); writeString16(ofs, kv.second); }
-
-        // Ğ´×´Ì¬Ó³Éä
-        header.stateNameMapOffset = ofs.tellp();
-        write_u32(ofs, stateMap.size());
-        for (auto& kv : stateMap) { write_u8(ofs, kv.first); writeString16(ofs, kv.second); }
-        header.subChunkCount = subChunks.size();
-        ofs.seekp(0); write_le<BCFHeader>(ofs, header);
-
-        ofs.close();
-    }
-
-    // ´ÓÎÄ¼ş¶ÁÈ¡×ÓÇø¿é
+    // å†™æ•´ä¸ª BCF æ–‡ä»¶
+static void writeBCF(const std::string& path, const std::vector<std::vector<BlockGroup>>& subChunks,  
+    const std::vector<PaletteKey>& paletteList,  
+    const std::map<BlockTypeID, std::string>& typeMap,  
+    const std::map<BlockStateID, std::string>& stateMap)  
+{  
+    std::ofstream ofs(path, std::ios::binary);  
+    BCFHeader header;  
+    write_le<BCFHeader>(ofs, header);  
+  
+    // è®°å½•æ¯ä¸ªå­åŒºå—çš„èµ·å§‹ä½ç½®  
+    std::vector<FilePos> subChunkOffsets;  
+    for (size_t i = 0; i < subChunks.size(); i++) {  
+        subChunkOffsets.push_back(ofs.tellp());  
+        Coord originY = static_cast<Coord>(i * 16);  
+        SubChunkUtils::writeSubChunk(ofs, subChunks[i], originY);  
+    }  
+  
+    // å†™å…¥å­åŒºå—åç§»é‡è¡¨  
+    header.subChunkOffsetsTableOffset = ofs.tellp();  
+    write_u64(ofs, subChunkOffsets.size());  
+    for (auto offset : subChunkOffsets) {  
+        write_u64(ofs, offset);  
+    }  
+  
+    // å†™ Palette æ˜ å°„  
+    header.paletteOffset = ofs.tellp();  
+    write_u32(ofs, paletteList.size());  
+    for (size_t pid = 0; pid < paletteList.size(); pid++) {  
+        const auto& k = paletteList[pid];  
+        write_u32(ofs, static_cast<uint32_t>(pid));  
+        write_u16(ofs, k.typeId);  
+        write_u16(ofs, k.states.size());  
+        for (auto& s : k.states) { write_u8(ofs, s.first); write_u8(ofs, s.second); }  
+    }  
+  
+    // å†™ç±»å‹åæ˜ å°„  
+    header.blockTypeMapOffset = ofs.tellp();  
+    write_u32(ofs, typeMap.size());  
+    for (auto& kv : typeMap) { write_u16(ofs, kv.first); writeString16(ofs, kv.second); }  
+  
+    // å†™çŠ¶æ€æ˜ å°„  
+    header.stateNameMapOffset = ofs.tellp();  
+    write_u32(ofs, stateMap.size());  
+    for (auto& kv : stateMap) { write_u8(ofs, kv.first); writeString16(ofs, kv.second); }  
+      
+    header.subChunkCount = subChunks.size();  
+    ofs.seekp(0); write_le<BCFHeader>(ofs, header);  
+  
+    ofs.close();  
+}
+    // ä»æ–‡ä»¶è¯»å–å­åŒºå—
     static std::vector<std::vector<BlockGroup>> readAllSubChunks(const std::string& path) {
         std::ifstream ifs(path, std::ios::binary);
         std::string line;
@@ -64,7 +74,7 @@ public:
 
         if (!ifs) { std::cerr << "Failed to open file\n"; return {}; }
         //while (ifs.get(byte)) {
-        //    // ´òÓ¡×Ö½ÚµÄÊ®Áù½øÖÆ±íÊ¾
+        //    // æ‰“å°å­—èŠ‚çš„åå…­è¿›åˆ¶è¡¨ç¤º
         //    std::cout << std::hex << static_cast<int>(static_cast<unsigned char>(byte)) << " ";
         //}
         BCFHeader header; 
@@ -82,11 +92,11 @@ public:
         std::ifstream ifs(path, std::ios::binary);
         if (!ifs) { std::cerr << "Failed to open file\n"; return {}; }
 
-        // ÏÈ¶ÁÈ¡ÎÄ¼şÍ·
+        // å…ˆè¯»å–æ–‡ä»¶å¤´
         BCFHeader header;
         read_le<BCFHeader>(ifs, header);
 
-        // Ìø×ªµ½ palette Æ«ÒÆ
+        // è·³è½¬åˆ° palette åç§»
         ifs.seekg(header.paletteOffset, std::ios::beg);
 
         uint32_t paletteCount = read_u32(ifs);
