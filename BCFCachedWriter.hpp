@@ -2,7 +2,6 @@
 #include "bcf_structs.hpp"  
 #include "bcf_io.hpp"  
 #include "SubChunkUtils.hpp"  
-#include "MergeUtils.hpp"  
 #include "BlockUtils.hpp"  
 #include <fstream>  
 #include <string>  
@@ -17,6 +16,12 @@ private:
     std::string outputFilename;  
     std::string tempDir;  
       
+    // 新增: 世界尺寸  
+    uint16_t width = 64;   // x 方向尺寸  
+    uint16_t length = 64;  // z 方向尺寸  
+    uint16_t height = 376; // y 方向尺寸 (320 - (-56) = 376)  
+    int minY = -56;        // 最小 y 坐标  
+
     // 元数据  
     std::vector<PaletteKey> paletteList;  
     std::map<BlockTypeID, std::string> typeMap;  
@@ -39,20 +44,31 @@ private:
     BlockStateID nextStateId = 0;  
   
 public:  
-    BCFCachedWriter(const std::string& filename,   
-                    const std::string& tempDir = "./temp_bcf_cache",  
-                    size_t maxBlocks = 5000)  
-        : outputFilename(filename), tempDir(tempDir),   
-          maxBlocksInMemory(maxBlocks) {  
-        std::filesystem::create_directories(tempDir);  
-    }  
-      
+    BCFCachedWriter(const std::string& filename,
+        const std::string& tempDir = "./temp_bcf_cache",
+        size_t maxBlocks = 5000,
+        uint16_t worldWidth = 64,
+        uint16_t worldLength = 64,
+        uint16_t worldHeight = 376,
+        int worldMinY = -56)
+        : outputFilename(filename), tempDir(tempDir),
+        maxBlocksInMemory(maxBlocks),
+        width(worldWidth), length(worldLength),
+        height(worldHeight), minY(worldMinY) {
+        std::filesystem::create_directories(tempDir);
+    }
     // 添加方块 - 自动管理 sub-chunk  
     void addBlock(int x, int y, int z,   
                   const std::string& blockType,  
                   const std::vector<std::pair<std::string, uint8_t>>& states = {}) {  
-        int subChunkIndex = y / 16;  
-        int localY = y % 16;  
+        // 新设计: x-z 平面按 64×64 分块, y 方向不分块  
+        int subChunkIndexX = x / 64;
+        int subChunkIndexZ = z / 64;
+        int subChunkIndex = subChunkIndexZ * (width / 64) + subChunkIndexX;  // 二维索引  
+
+        int localX = x % 64;
+        int localZ = z % 64;
+        int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]
           
         // 获取或创建 IDs (使用优化的 O(1) 查找)  
         BlockTypeID typeId = getOrCreateTypeId(blockType);  
@@ -214,98 +230,117 @@ private:
         subChunkCacheFiles[subChunkIndex] = cacheFile;  
     }  
       
-    // 优化: 在合并时统一处理所有片段  
-    void mergeAllCacheFiles() {  
-        std::ofstream ofs(outputFilename, std::ios::binary);  
-        if (!ofs) {  
-            throw std::runtime_error("Failed to create output file: " + outputFilename);  
-        }  
-          
+    // 优化: 流式合并,每次只处理一个子区块  
+    void mergeAllCacheFiles() {
+        std::ofstream ofs(outputFilename, std::ios::binary);
+        if (!ofs) {
+            throw std::runtime_error("Failed to create output file: " + outputFilename);
+        }
+
         // 写入占位符 header  
-        BCFHeader header;  
-        write_le<BCFHeader>(ofs, header);  
-          
+        BCFHeader header;
+        write_le<BCFHeader>(ofs, header);
+
         // 按顺序处理所有 sub-chunk  
-        std::vector<FilePos> subChunkOffsets;  
-          
-        for (const auto& [index, cacheFile] : subChunkCacheFiles) {  
-            subChunkOffsets.push_back(ofs.tellp());  
-              
-            // 读取所有片段  
-            std::ifstream ifs(cacheFile, std::ios::binary);  
-            if (!ifs) {  
-                throw std::runtime_error("Failed to read cache file: " + cacheFile);  
-            }  
-              
-            std::vector<BlockGroup> allGroups;  
-              
-            // 读取所有片段并收集  
-            while (ifs.peek() != EOF) {  
-                uint32_t groupCount = read_u32(ifs);  
-                for (uint32_t i = 0; i < groupCount; i++) {  
-                    allGroups.push_back(BlockUtils::readBlockGroup(ifs));  
-                }  
-            }  
-            ifs.close();  
-              
-            // 合并所有 groups  
-            allGroups = MergeUtils::mergeBlockGroups(allGroups);  
-              
+        std::vector<FilePos> subChunkOffsets;
+
+        for (const auto& [index, cacheFile] : subChunkCacheFiles) {
+            subChunkOffsets.push_back(ofs.tellp());
+
+            // 读取并增量合并当前子区块的所有片段  
+            std::ifstream ifs(cacheFile, std::ios::binary);
+            if (!ifs) {
+                throw std::runtime_error("Failed to read cache file: " + cacheFile);
+            }
+
+            // 使用 map 维护当前子区块的合并状态  
+            std::unordered_map<PaletteID, BlockGroup> mergedMap;
+
+            while (ifs.peek() != EOF) {
+                uint32_t groupCount = read_u32(ifs);
+
+                for (uint32_t i = 0; i < groupCount; i++) {
+                    BlockGroup bg = BlockUtils::readBlockGroup(ifs);
+
+                    // 立即合并到 map 中  
+                    auto& target = mergedMap[bg.paletteId];
+                    target.paletteId = bg.paletteId;
+                    target.x.insert(target.x.end(), bg.x.begin(), bg.x.end());
+                    target.y.insert(target.y.end(), bg.y.begin(), bg.y.end());
+                    target.z.insert(target.z.end(), bg.z.begin(), bg.z.end());
+                    target.count = static_cast<BlockCount>(target.x.size());
+                }
+            }
+            ifs.close();
+
+            // 转换为 vector  
+            std::vector<BlockGroup> mergedGroups;
+            mergedGroups.reserve(mergedMap.size());
+            for (auto& kv : mergedMap) {
+                mergedGroups.push_back(std::move(kv.second));
+            }
+
             // 写入到最终文件  
-            Coord originY = static_cast<Coord>(index * 16);  
-            SubChunkUtils::writeSubChunk(ofs, allGroups, originY);  
-        }  
-          
+            // 由于 y 方向不分块,所有子区块的 originY 都是 minY  
+            Coord originY = static_cast<Coord>(minY);
+            SubChunkUtils::writeSubChunk(ofs, mergedGroups, originY);
+
+            // 清空 mergedMap,释放当前子区块的内存  
+            mergedMap.clear();
+        }
         // 写入偏移量表  
-        FilePos offsetTablePos = ofs.tellp();  
-        write_u64(ofs, subChunkOffsets.size());  
-        for (auto offset : subChunkOffsets) {  
-            write_u64(ofs, offset);  
-        }  
-          
+        FilePos offsetTablePos = ofs.tellp();
+        write_u64(ofs, subChunkOffsets.size());
+        for (auto offset : subChunkOffsets) {
+            write_u64(ofs, offset);
+        }
+
         // 写入 palette  
-        FilePos palettePos = ofs.tellp();  
-        write_u32(ofs, static_cast<uint32_t>(paletteList.size()));  
-        for (size_t pid = 0; pid < paletteList.size(); pid++) {  
-            const auto& k = paletteList[pid];  
-            write_u32(ofs, static_cast<uint32_t>(pid));  
-            write_u16(ofs, k.typeId);  
-            write_u16(ofs, static_cast<uint16_t>(k.states.size()));  
-            for (const auto& s : k.states) {  
-                write_u8(ofs, s.first);  
-                write_u8(ofs, s.second);  
-            }  
-        }  
-          
+        FilePos palettePos = ofs.tellp();
+        write_u32(ofs, static_cast<uint32_t>(paletteList.size()));
+        for (size_t pid = 0; pid < paletteList.size(); pid++) {
+            const auto& k = paletteList[pid];
+            write_u32(ofs, static_cast<uint32_t>(pid));
+            write_u16(ofs, k.typeId);
+            write_u16(ofs, static_cast<uint16_t>(k.states.size()));
+            for (const auto& s : k.states) {
+                write_u8(ofs, s.first);
+                write_u8(ofs, s.second);
+            }
+        }
+
         // 写入 type map  
-        FilePos typeMapPos = ofs.tellp();  
-        write_u32(ofs, static_cast<uint32_t>(typeMap.size()));  
-        for (const auto& kv : typeMap) {  
-            write_u16(ofs, kv.first);  
-            writeString16(ofs, kv.second);  
-        }  
-          
+        FilePos typeMapPos = ofs.tellp();
+        write_u32(ofs, static_cast<uint32_t>(typeMap.size()));
+        for (const auto& kv : typeMap) {
+            write_u16(ofs, kv.first);
+            writeString16(ofs, kv.second);
+        }
+
         // 写入 state map  
-        FilePos stateMapPos = ofs.tellp();  
-        write_u32(ofs, static_cast<uint32_t>(stateMap.size()));  
-        for (const auto& kv : stateMap) {  
-            write_u8(ofs, kv.first);  
-            writeString16(ofs, kv.second);  
-        }  
-          
-        // 更新 header  
-        header.version = 2;  
-        header.subChunkCount = subChunkOffsets.size();  
-        header.subChunkOffsetsTableOffset = offsetTablePos;  
-        header.paletteOffset = palettePos;  
-        header.blockTypeMapOffset = typeMapPos;  
-        header.stateNameMapOffset = stateMapPos;  
-          
-        ofs.seekp(0);  
-        write_le<BCFHeader>(ofs, header);  
-        ofs.close();  
-    }  
-      
+        FilePos stateMapPos = ofs.tellp();
+        write_u32(ofs, static_cast<uint32_t>(stateMap.size()));
+        for (const auto& kv : stateMap) {
+            write_u8(ofs, kv.first);
+            writeString16(ofs, kv.second);
+        }
+
+        // 更新 header - 添加缺失的偏移量字段  
+        header.version = 2;
+        header.width = width;
+        header.length = length;
+        header.height = height;
+        header.subChunkBaseSize = height;  // y 方向不分块  
+        header.subChunkCount = subChunkOffsets.size();
+        header.subChunkOffsetsTableOffset = offsetTablePos;  // 新增  
+        header.paletteOffset = palettePos;                   // 新增  
+        header.blockTypeMapOffset = typeMapPos;              // 新增  
+        header.stateNameMapOffset = stateMapPos;             // 新增
+
+        ofs.seekp(0);
+        write_le<BCFHeader>(ofs, header);
+        ofs.close();
+    }
     void cleanup() {  
         // 删除所有临时文件  
         for (const auto& [index, cacheFile] : subChunkCacheFiles) {  

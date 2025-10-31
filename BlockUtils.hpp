@@ -2,7 +2,7 @@
 #include "bcf_structs.hpp"
 #include "bcf_io.hpp"
 #include <fstream>
-
+#include <unordered_map>
 // -------------------- BlockGroup ¹¤¾ß --------------------
 struct BlockUtils {
 

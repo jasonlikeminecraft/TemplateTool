@@ -1,57 +1,59 @@
-﻿#include <iostream>
-#include <vector>
-#include <map>
-#include <unordered_map>
-#include "BCFUtils.hpp"
-#include "BCFReader.hpp"
+﻿#include <iostream>  
+#include "BCFCachedWriter.hpp"  
+#include "BCFStreamReader.hpp"  
 int main() {
-    std::vector<BlockGroup> sub0, sub1;
 
-    // 添加方块
-    BlockGroup bg;
-    bg.paletteId = 0;
-    BlockUtils::addBlock(bg, 0, 0, 0);
-    BlockUtils::addBlock(bg, 1, 0, 0);
-    sub0.push_back(bg);
 
-    BlockGroup bg2;
-    bg2.paletteId = 1;
-    BlockUtils::addBlock(bg2, 2, 1, 1);
-    sub0.push_back(bg2);
+    BCFStreamReader reader("output.bcf");
+    // 2. 获取子区块总数  
+    size_t totalSubChunks = reader.getSubChunkCount();
+    std::cout << "Total sub-chunks: " << totalSubChunks << std::endl;
 
-    sub1.push_back(bg); // 第二个子区块重复使用
+    // 3. 按需读取指定的子区块  
+    for (size_t i = 0; i < totalSubChunks; i++) {
+        // getBlocks() 只读取第 i 个子区块,返回 vector<BlockInfo>  
+        std::vector<BlockInfo> blocks = reader.getBlocks(i);
 
-    // -------------------- 合并重复 BlockGroup --------------------
-    sub0 = MergeUtils::mergeBlockGroups(sub0);
-    sub1 = MergeUtils::mergeBlockGroups(sub1);
+        std::cout << "Sub-chunk " << i << " has " << blocks.size() << " blocks" << std::endl;
 
-    std::vector<std::vector<BlockGroup>> subChunks = { sub0, sub1 };
+        // 4. 处理每个方块  
+        for (const auto& block : blocks) {
+            std::cout << "Block at (" << block.x << ", " << block.y << ", " << block.z << "): "
+                << block.type << std::endl;
 
-    // Palette / Type / State
-    std::vector<PaletteKey> paletteList = { {1,{}}, {2,{{0,1}}} };
-    std::map<BlockTypeID, std::string> typeMap = { {1,"stone"},{2,"grass"} };
-    std::map<BlockStateID, std::string> stateMap = { {0,"snowy"} };
-
-    // 写文件
-    BCFUtils::writeBCF("1.bcf", subChunks, paletteList, typeMap, stateMap);
-    std::map<BlockTypeID, std::string> typeMap1{};
-    std::map<BlockStateID, std::string> stateMap1{};
-
-    BCFReader reader("1.bcf");
-    for (size_t i = 0; i < reader.getSubChunkCount(); i++)
-    {
-        auto subChunk = reader.getBlocks(i);
-        for (auto& bg : subChunk) {
-            if(bg.states.empty())
-                std::cout << "Block: " << bg.type << " " << bg.x << " " << bg.y << " " << bg.z << " " << "\n";
-            for (auto& block : bg.states) {
-                std::cout << "Block: " << bg.type << " " << bg.x << " " << bg.y << " " << bg.z << " " << block.first << ": " << block.second << "\n";
-                }
+           //  访问方块状态  
+            for (const auto& [stateName, stateValue] : block.states) {
+                std::cout << "  " << stateName << ": " << stateValue << std::endl;
+            }
         }
     }
-    // 读文件
-    //auto readSubChunks = BCFUtils::readAllSubChunks("1.bcf");
-    //for (size_t i = 0; i < readSubChunks.size(); i++) {
-    //    std::cout << "SubChunk " << i << " has " << readSubChunks[i].size() << " BlockGroups\n";
+
+    //// 创建 BCFCachedWriter 实例  
+    //// 参数: 输出文件名, 临时目录, 内存中最大方块数  
+    //BCFCachedWriter writer("output.bcf", "./temp_bcf_cache", 5000);
+
+    //// 添加方块 - 自动管理内存和临时文件  
+    //// 参数: x, y, z, 方块类型, 状态列表  
+    //writer.addBlock(0, 0, 0, "minecraft:stone", {});
+    //writer.addBlock(1, 0, 0, "minecraft:stone", {});
+    //writer.addBlock(2, 1, 1, "minecraft:grass", { {"snowy", 1} });
+
+    //int blocCount = 0;
+    //// 可以添加大量方块,不用担心内存溢出  
+    //for (int x = 0; x < 100; x++) {
+    //    for (int y = -56; y < 320; y++) {
+    //        for (int z = 0; z < 100; z++) {
+    //            writer.addBlock(x, y, z, "minecraft:dirt", {});
+    //            blocCount++;
+    //        }
+    //    }
     //}
+
+    //// 完成写入 - 合并所有临时文件并写入最终 BCF 文件  
+    //writer.finalize();
+
+    //std::cout << "BCF file written successfully!" << std::endl;
+    //std::cout << "Total blocks written: " << blocCount << std::endl;
+
+    return 0;
 }
