@@ -140,6 +140,7 @@
     <ClInclude Include="bcf_io.hpp" />
     <ClInclude Include="bcf_structs.hpp" />
     <ClInclude Include="BlockUtils.hpp" />
+    <ClInclude Include="RegionMergeUtils.hpp" />
     <ClInclude Include="SubChunkUtils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

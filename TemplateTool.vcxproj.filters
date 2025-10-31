@@ -47,5 +47,8 @@
     <ClInclude Include="BCFStreamReader.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="RegionMergeUtils.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

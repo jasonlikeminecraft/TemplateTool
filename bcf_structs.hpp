@@ -11,10 +11,10 @@ using BlockCount = uint32_t;   // 方块数量
 using Coord = int16_t;    // 坐标 x/y/z 范围 -32767~32767
 using BlockTypeID = uint16_t;   // 方块类型 ID
 using BlockStateID = uint8_t;    // 方块状态 ID
-using StateValue = uint8_t;    // 状态值
+using StateValueID = uint8_t;    // 状态值 ID  
 using Version = uint8_t;    // 文件版本号
 
-using StatePair = std::pair<BlockStateID, StateValue>;
+using StatePair = std::pair<BlockStateID, StateValueID>;
 #pragma pack(push,1)
 // -------------------- 文件头 --------------------
 
@@ -28,12 +28,13 @@ struct BCFHeader {
     FilePos paletteOffset;  
     FilePos blockTypeMapOffset;  
     FilePos stateNameMapOffset;  
+    FilePos stateValueMapOffset;  // 新增字段  
   
     BCFHeader()  
         : version(2), width(64), length(64), height(376),  // 版本改为 2  
         subChunkBaseSize(376), subChunkCount(0),
         subChunkOffsetsTableOffset(0),  // 新增字段  
-        paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0)  
+        paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0)  , stateValueMapOffset(0)
     {  
         magic[0] = 'B'; magic[1] = 'C'; magic[2] = 'F';  
     }  
@@ -41,11 +42,11 @@ struct BCFHeader {
 
 // -------------------- 子区块头 --------------------
 struct SubChunkHeader {
-    SubChunkSize subChunkSize;   // 子区块字节数
+    SubChunkSize subChunkSize;
     Coord originY;
-    BlockCount blockGroupCount;
+    BlockCount blockRegionCount;  // 改名:区域数量而非组数量  
 
-    SubChunkHeader() : subChunkSize(0), originY(0), blockGroupCount(0) {}
+    SubChunkHeader() : subChunkSize(0), originY(0), blockRegionCount(0) {}
 };
 
 // -------------------- 同类方块组 --------------------
@@ -85,4 +86,13 @@ struct BlockInfo {
     std::string type;                     // 类型字符串
     std::vector<std::pair<std::string, std::string>> states; // <状态名,状态值>
 };
+
+
+
+struct BlockRegion {
+    PaletteID paletteId;
+    Coord x1, y1, z1;  // 起始坐标  
+    Coord x2, y2, z2;  // 结束坐标  
+};
+
 #pragma pack(pop)

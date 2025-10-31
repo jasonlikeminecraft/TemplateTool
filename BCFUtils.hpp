@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <fstream>
+#include <iostream>
 struct BCFUtils {
 
     private:
@@ -16,22 +17,22 @@ struct BCFUtils {
 public:
 
     // 写整个 BCF 文件
-static void writeBCF(const std::string& path, const std::vector<std::vector<BlockGroup>>& subChunks,  
-    const std::vector<PaletteKey>& paletteList,  
-    const std::map<BlockTypeID, std::string>& typeMap,  
-    const std::map<BlockStateID, std::string>& stateMap)  
-{  
-    std::ofstream ofs(path, std::ios::binary);  
-    BCFHeader header;  
-    write_le<BCFHeader>(ofs, header);  
-  
-    // 记录每个子区块的起始位置  
-    std::vector<FilePos> subChunkOffsets;  
-    for (size_t i = 0; i < subChunks.size(); i++) {  
-        subChunkOffsets.push_back(ofs.tellp());  
-        Coord originY = static_cast<Coord>(i * 16);  
-        SubChunkUtils::writeSubChunk(ofs, subChunks[i], originY);  
-    }  
+    static void writeBCF(const std::string& path,
+        const std::vector<std::vector<BlockRegion>>& subChunks,  // 改为 BlockRegion  
+        const std::vector<PaletteKey>& paletteList,
+        const std::map<BlockTypeID, std::string>& typeMap,
+        const std::map<BlockStateID, std::string>& stateMap)
+    {
+        std::ofstream ofs(path, std::ios::binary);
+        BCFHeader header;
+        write_le<BCFHeader>(ofs, header);
+
+        std::vector<FilePos> subChunkOffsets;
+        for (size_t i = 0; i < subChunks.size(); i++) {
+            subChunkOffsets.push_back(ofs.tellp());
+            Coord originY = static_cast<Coord>(i * 16);
+            SubChunkUtils::writeSubChunk(ofs, subChunks[i], originY);  // 使用新的 writeSubChunk  
+        }
   
     // 写入子区块偏移量表  
     header.subChunkOffsetsTableOffset = ofs.tellp();  
@@ -68,24 +69,24 @@ static void writeBCF(const std::string& path, const std::vector<std::vector<Bloc
 }
     // 从文件读取子区块
     static std::vector<std::vector<BlockGroup>> readAllSubChunks(const std::string& path) {
-        std::ifstream ifs(path, std::ios::binary);
-        std::string line;
-        char byte;
+        //std::ifstream ifs(path, std::ios::binary);
+        //std::string line;
+        //char byte;
 
-        if (!ifs) { std::cerr << "Failed to open file\n"; return {}; }
-        //while (ifs.get(byte)) {
-        //    // 打印字节的十六进制表示
-        //    std::cout << std::hex << static_cast<int>(static_cast<unsigned char>(byte)) << " ";
+        //if (!ifs) { std::cerr << "Failed to open file\n"; return {}; }
+        ////while (ifs.get(byte)) {
+        ////    // 打印字节的十六进制表示
+        ////    std::cout << std::hex << static_cast<int>(static_cast<unsigned char>(byte)) << " ";
+        ////}
+        //BCFHeader header; 
+        //read_le<BCFHeader>(ifs, header);
+        //std::vector<std::vector<BlockGroup>> subChunks;
+        //subChunks.reserve(header.subChunkCount);
+        //for (size_t i = 0; i < header.subChunkCount; i++) {
+        //    SubChunkSize sz; Coord oy;
+        //    subChunks.push_back(SubChunkUtils::readSubChunk(ifs, sz, oy));
         //}
-        BCFHeader header; 
-        read_le<BCFHeader>(ifs, header);
-        std::vector<std::vector<BlockGroup>> subChunks;
-        subChunks.reserve(header.subChunkCount);
-        for (size_t i = 0; i < header.subChunkCount; i++) {
-            SubChunkSize sz; Coord oy;
-            subChunks.push_back(SubChunkUtils::readSubChunk(ifs, sz, oy));
-        }
-        return subChunks;
+        //return subChunks;
     }
 
     std::vector<PaletteKey> readPalette(const std::string& path) {

@@ -3,6 +3,7 @@
 #include "bcf_io.hpp"  
 #include "SubChunkUtils.hpp"  
 #include "BlockUtils.hpp"  
+#include "RegionMergeUtils.hpp"
 #include <fstream>  
 #include <string>  
 #include <map>  
@@ -31,6 +32,11 @@ private:
     std::unordered_map<std::string, BlockTypeID> typeNameToId;  
     std::unordered_map<std::string, BlockStateID> stateNameToId;  
       
+
+    std::map<StateValueID, std::string> stateValueMap;  // ID -> 状态值字符串  
+    std::unordered_map<std::string, StateValueID> stateValueToId;  // 反向映射,O(1) 查找  
+    StateValueID nextStateValueId = 0;
+
     // 跟踪缓存文件  
     std::map<int, std::string> subChunkCacheFiles;  
       
@@ -60,7 +66,7 @@ public:
     // 添加方块 - 自动管理 sub-chunk  
     void addBlock(int x, int y, int z,   
                   const std::string& blockType,  
-                  const std::vector<std::pair<std::string, uint8_t>>& states = {}) {  
+                  const std::vector<std::pair<std::string, std::string>>& states = {}) {  
         // 新设计: x-z 平面按 64×64 分块, y 方向不分块  
         int subChunkIndexX = x / 64;
         int subChunkIndexZ = z / 64;
@@ -75,10 +81,11 @@ public:
           
         PaletteKey key;  
         key.typeId = typeId;  
-        for (const auto& [stateName, stateValue] : states) {  
-            BlockStateID stateId = getOrCreateStateId(stateName);  
-            key.states.push_back({stateId, stateValue});  
-        }  
+        for (const auto& [stateName, stateValue] : states) {
+            BlockStateID stateId = getOrCreateStateId(stateName);
+            StateValueID valueId = getOrCreateStateValue(stateValue);  // 新增  
+            key.states.push_back({ stateId, valueId });
+        }
           
         PaletteID paletteId = getOrCreatePaletteId(key);  
           
@@ -137,6 +144,17 @@ private:
         return newId;  
     }  
       
+    StateValueID getOrCreateStateValue(const std::string& stateValue) {
+        auto it = stateValueToId.find(stateValue);
+        if (it != stateValueToId.end()) {
+            return it->second;
+        }
+
+        StateValueID newId = nextStateValueId++;
+        stateValueMap[newId] = stateValue;
+        stateValueToId[stateValue] = newId;
+        return newId;
+    }
     PaletteID getOrCreatePaletteId(const PaletteKey& key) {  
         auto it = paletteCache.find(key);  
         if (it != paletteCache.end()) {  
@@ -247,47 +265,34 @@ private:
         for (const auto& [index, cacheFile] : subChunkCacheFiles) {
             subChunkOffsets.push_back(ofs.tellp());
 
-            // 读取并增量合并当前子区块的所有片段  
+            // 读取所有片段  
             std::ifstream ifs(cacheFile, std::ios::binary);
             if (!ifs) {
                 throw std::runtime_error("Failed to read cache file: " + cacheFile);
             }
 
-            // 使用 map 维护当前子区块的合并状态  
-            std::unordered_map<PaletteID, BlockGroup> mergedMap;
+            std::vector<BlockGroup> allGroups;
 
+            // 读取所有片段并收集  
             while (ifs.peek() != EOF) {
                 uint32_t groupCount = read_u32(ifs);
-
                 for (uint32_t i = 0; i < groupCount; i++) {
-                    BlockGroup bg = BlockUtils::readBlockGroup(ifs);
-
-                    // 立即合并到 map 中  
-                    auto& target = mergedMap[bg.paletteId];
-                    target.paletteId = bg.paletteId;
-                    target.x.insert(target.x.end(), bg.x.begin(), bg.x.end());
-                    target.y.insert(target.y.end(), bg.y.begin(), bg.y.end());
-                    target.z.insert(target.z.end(), bg.z.begin(), bg.z.end());
-                    target.count = static_cast<BlockCount>(target.x.size());
+                    allGroups.push_back(BlockUtils::readBlockGroup(ifs));
                 }
             }
             ifs.close();
 
-            // 转换为 vector  
-            std::vector<BlockGroup> mergedGroups;
-            mergedGroups.reserve(mergedMap.size());
-            for (auto& kv : mergedMap) {
-                mergedGroups.push_back(std::move(kv.second));
-            }
+            // 先合并相同 paletteId 的 BlockGroup  
+            allGroups = MergeUtils::mergeBlockGroups(allGroups);
 
-            // 写入到最终文件  
-            // 由于 y 方向不分块,所有子区块的 originY 都是 minY  
-            Coord originY = static_cast<Coord>(minY);
-            SubChunkUtils::writeSubChunk(ofs, mergedGroups, originY);
+            // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion  
+            auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups);
 
-            // 清空 mergedMap,释放当前子区块的内存  
-            mergedMap.clear();
+            // 写入到最终文件 (使用新的 BlockRegion 格式)  
+            Coord originY = static_cast<Coord>(index * 16);
+            SubChunkUtils::writeSubChunk(ofs, mergedRegions, originY);
         }
+
         // 写入偏移量表  
         FilePos offsetTablePos = ofs.tellp();
         write_u64(ofs, subChunkOffsets.size());
@@ -325,17 +330,24 @@ private:
             writeString16(ofs, kv.second);
         }
 
-        // 更新 header - 添加缺失的偏移量字段  
-        header.version = 2;
-        header.width = width;
-        header.length = length;
-        header.height = height;
-        header.subChunkBaseSize = height;  // y 方向不分块  
+        // 写入 state value map  
+        FilePos stateValueMapPos = ofs.tellp();
+        write_u32(ofs, static_cast<uint32_t>(stateValueMap.size()));
+        for (const auto& kv : stateValueMap) {
+            write_u8(ofs, kv.first);
+            writeString16(ofs, kv.second);
+        }
+
+        // 更新 header 时添加新的偏移量字段  
+        header.stateValueMapOffset = stateValueMapPos;  // 需要在 BCFHeader 
+
+        // 更新 header (版本升级到 3)  
+        header.version = 3;  // 新版本支持 BlockRegion  
         header.subChunkCount = subChunkOffsets.size();
-        header.subChunkOffsetsTableOffset = offsetTablePos;  // 新增  
-        header.paletteOffset = palettePos;                   // 新增  
-        header.blockTypeMapOffset = typeMapPos;              // 新增  
-        header.stateNameMapOffset = stateMapPos;             // 新增
+        header.subChunkOffsetsTableOffset = offsetTablePos;
+        header.paletteOffset = palettePos;
+        header.blockTypeMapOffset = typeMapPos;
+        header.stateNameMapOffset = stateMapPos;
 
         ofs.seekp(0);
         write_le<BCFHeader>(ofs, header);

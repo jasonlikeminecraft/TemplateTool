@@ -16,6 +16,7 @@ private:
     // 优化 2: 使用 unordered_map 替代 map (O(1) 查找)  
     std::unordered_map<BlockTypeID, std::string> typeMap;    
     std::unordered_map<BlockStateID, std::string> stateMap;    
+    std::unordered_map<StateValueID, std::string> stateValueMap;
       
     // 优化 1: 缓存文件流,避免重复打开  
     mutable std::ifstream cachedStream;  
@@ -79,66 +80,122 @@ public:
             stateMap[id] = std::move(name);  // 使用 move 避免拷贝  
         }    
           
+        // 读取状态值映射  
+        ifs.seekg(header.stateValueMapOffset, std::ios::beg);
+        uint32_t stateValueCount = read_u32(ifs);
+        stateValueMap.reserve(stateValueCount);
+        for (uint32_t i = 0; i < stateValueCount; i++) {
+            StateValueID id = read_u8(ifs);
+            std::string value = readString16(ifs);
+            stateValueMap[id] = std::move(value);
+        }
         // 构造完成后关闭临时文件流  
         ifs.close();  
     }    
     
     // 流式读取指定子区块    
-    std::vector<BlockInfo> getBlocks(size_t subChunkIndex) {    
-        std::vector<BlockInfo> result;    
-        if (subChunkIndex >= subChunkOffsets.size()) return result;    
-    
-        // 优化 1: 复用文件流,避免重复打开  
-        if (!cachedStream.is_open()) {    
-            cachedStream.open(filename, std::ios::binary);    
-            if (!cachedStream) {  
-                throw std::runtime_error("Failed to reopen file for streaming");  
-            }  
-        }    
-          
-        // 跳转到目标子区块  
-        cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);    
-    
-        // 读取子区块    
-        SubChunkSize sz;    
-        Coord oy;    
-        auto groups = SubChunkUtils::readSubChunk(cachedStream, sz, oy);    
-    
-        // 优化 3: 预分配 result 容量  
-        size_t totalBlocks = 0;  
-        for (const auto& bg : groups) {  
-            totalBlocks += bg.count;  
-        }  
-        result.reserve(totalBlocks);  
-    
-        // 转换为 BlockInfo    
-        for (auto& bg : groups) {    
-            const PaletteKey& pk = paletteList[bg.paletteId];    
-              
-            // 优化 2: unordered_map 的 O(1) 查找  
-            const std::string& typeStr = typeMap.at(pk.typeId);    
-              
-            for (size_t i = 0; i < bg.count; i++) {    
-                BlockInfo bi;    
-                bi.x = bg.x[i]; bi.y = bg.y[i]; bi.z = bg.z[i];    
-                bi.type = typeStr;    
-                  
-                // 预分配状态 vector 容量  
-                bi.states.reserve(pk.states.size());  
-                  
-                for (auto& s : pk.states) {    
-                    // 优化 2: unordered_map 的 O(1) 查找  
-                    const std::string& stateName = stateMap.at(s.first);    
-                    bi.states.push_back({ stateName, std::to_string(s.second) });    
-                }    
-                result.push_back(std::move(bi));  // 使用 move 避免拷贝  
-            }    
-        }    
-        return result;    
-    }    
+    //std::vector<BlockInfo> getBlocks(size_t subChunkIndex) {    
+    //    std::vector<BlockInfo> result;    
+    //    if (subChunkIndex >= subChunkOffsets.size()) return result;    
+    //
+    //    // 优化 1: 复用文件流,避免重复打开  
+    //    if (!cachedStream.is_open()) {    
+    //        cachedStream.open(filename, std::ios::binary);    
+    //        if (!cachedStream) {  
+    //            throw std::runtime_error("Failed to reopen file for streaming");  
+    //        }  
+    //    }    
+    //      
+    //    // 跳转到目标子区块  
+    //    cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);    
+    //
+    //    // 读取子区块    
+    //    SubChunkSize sz;    
+    //    Coord oy;    
+    //    auto groups = SubChunkUtils::readSubChunk(cachedStream, sz, oy);    
+    //
+    //    // 优化 3: 预分配 result 容量  
+    //    size_t totalBlocks = 0;  
+    //    for (const auto& bg : groups) {  
+    //        totalBlocks += bg.count;  
+    //    }  
+    //    result.reserve(totalBlocks);  
+    //
+    //    // 转换为 BlockInfo    
+    //    for (auto& bg : groups) {    
+    //        const PaletteKey& pk = paletteList[bg.paletteId];    
+    //          
+    //        // 优化 2: unordered_map 的 O(1) 查找  
+    //        const std::string& typeStr = typeMap.at(pk.typeId);    
+    //          
+    //        for (size_t i = 0; i < bg.count; i++) {    
+    //            BlockInfo bi;    
+    //            bi.x = bg.x[i]; bi.y = bg.y[i]; bi.z = bg.z[i];    
+    //            bi.type = typeStr;    
+    //              
+    //            // 预分配状态 vector 容量  
+    //            bi.states.reserve(pk.states.size());  
+    //              
+    //            for (auto& s : pk.states) {    
+    //                // 优化 2: unordered_map 的 O(1) 查找  
+    //                const std::string& stateName = stateMap.at(s.first);    
+    //                bi.states.push_back({ stateName, std::to_string(s.second) });    
+    //            }    
+    //            result.push_back(std::move(bi));  // 使用 move 避免拷贝  
+    //        }    
+    //    }    
+    //    return result;    
+    //}    
     
     size_t getSubChunkCount() const { return subChunkOffsets.size(); }    
-      
+    // 在 BCFStreamReader 中添加:  
+    std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) {
+        std::vector<BlockRegion> result;
+        if (subChunkIndex >= subChunkOffsets.size()) return result;
+
+        if (!cachedStream.is_open()) {
+            cachedStream.open(filename, std::ios::binary);
+            if (!cachedStream) {
+                throw std::runtime_error("Failed to reopen file for streaming");
+            }
+        }
+
+        cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);
+        SubChunkSize sz;
+        Coord oy;
+        return SubChunkUtils::readSubChunk(cachedStream, sz, oy);  // 直接返回 BlockRegion  
+    }
+
+
+    const PaletteKey& getPaletteKey(PaletteID paletteId) const {
+        if (paletteId >= paletteList.size()) {
+            throw std::out_of_range("Invalid paletteId");
+        }
+        return paletteList[paletteId];
+    }
+
+    std::string getBlockType(BlockTypeID typeId) const {
+        auto it = typeMap.find(typeId);
+        if (it == typeMap.end()) {
+            return "minecraft:air";
+        }
+        return it->second;
+    }
+
+    std::string getStateName(BlockStateID stateId) const {
+        auto it = stateMap.find(stateId);
+        if (it == stateMap.end()) {
+            return "unknown";
+        }
+        return it->second;
+    }
+    std::string getStateValue(StateValueID valueId) const {
+        auto it = stateValueMap.find(valueId);
+        if (it == stateValueMap.end()) {
+            return "0";  // 默认值  
+        }
+        return it->second;
+    }
     // 析构函数确保文件流关闭  
     ~BCFStreamReader() {  
         if (cachedStream.is_open()) {  
