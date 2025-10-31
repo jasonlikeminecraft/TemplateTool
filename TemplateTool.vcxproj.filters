@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="头文件\BCKFile">
+      <UniqueIdentifier>{124f5bd9-02a2-44b9-b508-91c9da86da17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\ToMCF">
+      <UniqueIdentifier>{84276c30-54eb-427f-80b8-2f9e1add99e5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TemplateTool.cpp">
@@ -20,35 +26,38 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bcf_structs.hpp">
-      <Filter>头文件</Filter>
+    <ClInclude Include="SubChunkUtils.hpp">
+      <Filter>头文件\BCKFile</Filter>
     </ClInclude>
     <ClInclude Include="bcf_io.hpp">
-      <Filter>头文件</Filter>
+      <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="BlockUtils.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="SubChunkUtils.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="BCFUtils.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="BCFReader.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="BCFWriter.hpp">
-      <Filter>头文件</Filter>
+    <ClInclude Include="bcf_structs.hpp">
+      <Filter>头文件\BCKFile</Filter>
     </ClInclude>
     <ClInclude Include="BCFCachedWriter.hpp">
-      <Filter>头文件</Filter>
+      <Filter>头文件\BCKFile</Filter>
+    </ClInclude>
+    <ClInclude Include="BCFReader.hpp">
+      <Filter>头文件\BCKFile</Filter>
     </ClInclude>
     <ClInclude Include="BCFStreamReader.hpp">
-      <Filter>头文件</Filter>
+      <Filter>头文件\BCKFile</Filter>
+    </ClInclude>
+    <ClInclude Include="BCFUtils.hpp">
+      <Filter>头文件\BCKFile</Filter>
+    </ClInclude>
+    <ClInclude Include="BCFWriter.hpp">
+      <Filter>头文件\BCKFile</Filter>
+    </ClInclude>
+    <ClInclude Include="BlockUtils.hpp">
+      <Filter>头文件\BCKFile</Filter>
     </ClInclude>
     <ClInclude Include="RegionMergeUtils.hpp">
-      <Filter>头文件</Filter>
+      <Filter>头文件\BCKFile</Filter>
+    </ClInclude>
+    <ClInclude Include="McstructureToBCF.hpp">
+      <Filter>头文件\ToMCF</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
