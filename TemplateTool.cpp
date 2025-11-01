@@ -42,7 +42,7 @@ int main() {
     }
 
     //McstructureToBCF mcstructureToBCF("input.mcstructure" ,"output.bcf");
-   // mcstructureToBCF.convert();
+    //mcstructureToBCF.convert();
 
     //// 创建 BCFCachedWriter 实例  
     //// 参数: 输出文件名, 临时目录, 内存中最大方块数  

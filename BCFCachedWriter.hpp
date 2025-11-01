@@ -18,8 +18,8 @@ private:
     std::string tempDir;  
       
     // 新增: 世界尺寸  
-    uint16_t width = 64;   // x 方向尺寸  
-    uint16_t length = 64;  // z 方向尺寸  
+    uint16_t width = 160;   // x 方向尺寸  
+    uint16_t length = 160;  // z 方向尺寸  
     uint16_t height = 376; // y 方向尺寸 (320 - (-56) = 376)  
     int minY = -56;        // 最小 y 坐标  
 
@@ -42,7 +42,7 @@ private:
       
     // 当前活跃的 sub-chunk  
     std::map<int, std::vector<BlockGroup>> activeSubChunks;  
-    size_t maxBlocksInMemory = 5000;  
+    size_t maxBlocksInMemory = 50000;  
       
     // ID 管理  
     std::unordered_map<PaletteKey, PaletteID, PaletteKeyHash> paletteCache;  
@@ -53,8 +53,8 @@ public:
     BCFCachedWriter(const std::string& filename,
         const std::string& tempDir = "./temp_bcf_cache",
         size_t maxBlocks = 5000,
-        uint16_t worldWidth = 64,
-        uint16_t worldLength = 64,
+        uint16_t worldWidth = 160,
+        uint16_t worldLength = 160,
         uint16_t worldHeight = 376,
         int worldMinY = -56)
         : outputFilename(filename), tempDir(tempDir),
@@ -68,12 +68,12 @@ public:
                   const std::string& blockType,  
                   const std::vector<std::pair<std::string, std::string>>& states = {}) {  
         // 新设计: x-z 平面按 64×64 分块, y 方向不分块  
-        int subChunkIndexX = x / 64;
-        int subChunkIndexZ = z / 64;
-        int subChunkIndex = subChunkIndexZ * (width / 64) + subChunkIndexX;  // 二维索引  
+        int subChunkIndexX = x / 160;
+        int subChunkIndexZ = z / 160;
+        int subChunkIndex = subChunkIndexZ * (width / 160) + subChunkIndexX;  // 二维索引  
 
-        int localX = x % 64;
-        int localZ = z % 64;
+        int localX = x % 160;
+        int localZ = z % 160;
         int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]
           
         // 获取或创建 IDs (使用优化的 O(1) 查找)  
