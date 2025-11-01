@@ -37,6 +37,7 @@ struct SubChunkUtils {
         originY = read_i16(ifs);
         BlockCount regionCount = read_u32(ifs);
 
+
         std::vector<BlockRegion> regions;
         regions.reserve(regionCount);
 

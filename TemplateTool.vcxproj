@@ -146,10 +146,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BCFCachedWriter.hpp" />
-    <ClInclude Include="BCFReader.hpp" />
     <ClInclude Include="BCFStreamReader.hpp" />
     <ClInclude Include="BCFUtils.hpp" />
-    <ClInclude Include="BCFWriter.hpp" />
     <ClInclude Include="bcf_io.hpp" />
     <ClInclude Include="bcf_structs.hpp" />
     <ClInclude Include="BlockUtils.hpp" />

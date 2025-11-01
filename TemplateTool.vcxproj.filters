@@ -38,16 +38,10 @@
     <ClInclude Include="BCFCachedWriter.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="BCFReader.hpp">
-      <Filter>头文件\BCKFile</Filter>
-    </ClInclude>
     <ClInclude Include="BCFStreamReader.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
     <ClInclude Include="BCFUtils.hpp">
-      <Filter>头文件\BCKFile</Filter>
-    </ClInclude>
-    <ClInclude Include="BCFWriter.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
     <ClInclude Include="BlockUtils.hpp">
