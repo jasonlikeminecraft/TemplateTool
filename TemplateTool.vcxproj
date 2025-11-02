@@ -108,7 +108,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level1</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -125,7 +125,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level1</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -142,6 +142,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="include\src\endian_str.cpp" />
+    <ClCompile Include="include\src\io\izlibstream.cpp" />
+    <ClCompile Include="include\src\io\ozlibstream.cpp" />
+    <ClCompile Include="include\src\io\stream_reader.cpp" />
+    <ClCompile Include="include\src\io\stream_writer.cpp" />
+    <ClCompile Include="include\src\tag.cpp" />
+    <ClCompile Include="include\src\tag_compound.cpp" />
+    <ClCompile Include="include\src\tag_list.cpp" />
+    <ClCompile Include="include\src\tag_string.cpp" />
+    <ClCompile Include="include\src\text\json_formatter.cpp" />
+    <ClCompile Include="include\src\value.cpp" />
+    <ClCompile Include="include\src\value_initializer.cpp" />
     <ClCompile Include="TemplateTool.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +163,52 @@
     <ClInclude Include="bcf_io.hpp" />
     <ClInclude Include="bcf_structs.hpp" />
     <ClInclude Include="BlockUtils.hpp" />
+    <ClInclude Include="include\crtp_tag.h" />
+    <ClInclude Include="include\endian_str.h" />
+    <ClInclude Include="include\io\izlibstream.h" />
+    <ClInclude Include="include\io\ozlibstream.h" />
+    <ClInclude Include="include\io\stream_reader.h" />
+    <ClInclude Include="include\io\stream_writer.h" />
+    <ClInclude Include="include\io\zlib_streambuf.h" />
+    <ClInclude Include="include\make_unique.h" />
+    <ClInclude Include="include\mcnbt\be\block_entity.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\banner_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\beacon_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\beehive_and_bee_nest_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\bell_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\brewing_stand_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\command_block_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\common_block_entity_data.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_entity\structure_block_bed.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_state.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_state\command_block_bsd.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_state\common_block_state_data.hpp" />
+    <ClInclude Include="include\mcnbt\be\block_state\structure_block_bsd.hpp" />
+    <ClInclude Include="include\mcnbt\be\entity.hpp" />
+    <ClInclude Include="include\mcnbt\be\entity\common_entity_data.hpp" />
+    <ClInclude Include="include\mcnbt\be\enums\biome.hpp" />
+    <ClInclude Include="include\mcnbt\be\enums\color.hpp" />
+    <ClInclude Include="include\mcnbt\be\enums\effect.hpp" />
+    <ClInclude Include="include\mcnbt\be\enums\enhance.hpp" />
+    <ClInclude Include="include\mcnbt\be\item.hpp" />
+    <ClInclude Include="include\mcnbt\be\item\common_item_data.hpp" />
+    <ClInclude Include="include\mcnbt\be\mcstructure.hpp" />
+    <ClInclude Include="include\mcnbt\gzip.hpp" />
+    <ClInclude Include="include\mcnbt\mcnbt.hpp" />
+    <ClInclude Include="include\nbt_export.h" />
+    <ClInclude Include="include\nbt_tags.h" />
+    <ClInclude Include="include\nbt_visitor.h" />
+    <ClInclude Include="include\primitive_detail.h" />
+    <ClInclude Include="include\tag.h" />
+    <ClInclude Include="include\tagfwd.h" />
+    <ClInclude Include="include\tag_array.h" />
+    <ClInclude Include="include\tag_compound.h" />
+    <ClInclude Include="include\tag_list.h" />
+    <ClInclude Include="include\tag_primitive.h" />
+    <ClInclude Include="include\tag_string.h" />
+    <ClInclude Include="include\text\json_formatter.h" />
+    <ClInclude Include="include\value.h" />
+    <ClInclude Include="include\value_initializer.h" />
     <ClInclude Include="McstructureToBCF.hpp" />
     <ClInclude Include="RegionMergeUtils.hpp" />
     <ClInclude Include="SubChunkUtils.hpp" />

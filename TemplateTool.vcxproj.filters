@@ -24,6 +24,42 @@
     <ClCompile Include="TemplateTool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="include\src\io\izlibstream.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\io\ozlibstream.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\io\stream_reader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\io\stream_writer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\text\json_formatter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\endian_str.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\tag.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\tag_compound.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\tag_list.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\tag_string.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\value.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="include\src\value_initializer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SubChunkUtils.hpp">
@@ -52,6 +88,144 @@
     </ClInclude>
     <ClInclude Include="McstructureToBCF.hpp">
       <Filter>头文件\ToMCF</Filter>
+    </ClInclude>
+    <ClInclude Include="include\io\izlibstream.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\io\ozlibstream.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\io\stream_reader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\io\stream_writer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\io\zlib_streambuf.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\banner_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\beacon_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\beehive_and_bee_nest_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\bell_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\brewing_stand_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\command_block_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\common_block_entity_data.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity\structure_block_bed.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_state\command_block_bsd.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_state\common_block_state_data.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_state\structure_block_bsd.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\entity\common_entity_data.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\enums\biome.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\enums\color.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\enums\effect.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\enums\enhance.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\item\common_item_data.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_entity.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\block_state.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\entity.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\item.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\be\mcstructure.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\gzip.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mcnbt\mcnbt.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\text\json_formatter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\crtp_tag.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\endian_str.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\make_unique.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\nbt_tags.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\nbt_visitor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\primitive_detail.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tag.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tag_array.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tag_compound.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tag_list.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tag_primitive.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tag_string.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\tagfwd.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\value.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\value_initializer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\nbt_export.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

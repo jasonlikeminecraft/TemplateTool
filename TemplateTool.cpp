@@ -2,6 +2,8 @@
 #include "BCFCachedWriter.hpp"  
 #include "BCFStreamReader.hpp"  
 #include "McstructureToBCF.hpp"
+#include <nbt_tags.h>
+#include <io/stream_reader.h>
 int main() {
 
 
@@ -25,19 +27,19 @@ int main() {
             // 获取方块类型字符串  
             std::string blockType = reader.getBlockType(pk.typeId);
 
-          //  std::cout << "Region at (" << region.x1 << ", " << region.y1 << ", " << region.z1
-          //      << ") to (" << region.x2 << ", " << region.y2 << ", " << region.z2 << "): "
-          //      << blockType << std::endl;
+            //std::cout << "Region at (" << region.x1 << ", " << region.y1 << ", " << region.z1
+            //    << ") to (" << region.x2 << ", " << region.y2 << ", " << region.z2 << "): "
+            //    << blockType << std::endl;
 
-          //// 访问方块状态    
-          //  if (!pk.states.empty()) {
-          //      std::cout << "  States:" << std::endl;
-          //      for (const auto& [stateId, stateValueId] : pk.states) {
-          //          std::string stateName = reader.getStateName(stateId);
-          //          std::string stateValue = reader.getStateValue(stateValueId);  // 新增方法  
-          //          std::cout << "    " << stateName << ": " << stateValue << std::endl;
-          //      }
-          //  }
+          // 访问方块状态    
+            if (!pk.states.empty()) {
+                std::cout << "  States:" << std::endl;
+                for (const auto& [stateId, stateValueId] : pk.states) {
+                    std::string stateName = reader.getStateName(stateId);
+                    std::string stateValue = reader.getStateValue(stateValueId);  // 新增方法  
+                    std::cout << "    " << stateName << ": " << stateValue << std::endl;
+                }
+            }
         }
     }
 
@@ -71,6 +73,6 @@ int main() {
 
     //std::cout << "BCF file written successfully!" << std::endl;
     //std::cout << "Total blocks written: " << blocCount << std::endl;
-
+    std::cin.get();
     return 0;
 }
