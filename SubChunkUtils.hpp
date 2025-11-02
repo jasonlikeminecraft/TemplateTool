@@ -7,10 +7,12 @@ struct SubChunkUtils {
     // 写入子区块
     static void writeSubChunk(std::ofstream& ofs,
         const std::vector<BlockRegion>& regions,
-        Coord originY) {
+        Coord originX, Coord originY, Coord originZ) {  // 添加 originX 和 originZ 参数  
         std::streampos startPos = ofs.tellp();
-        write_u64(ofs, 0); // 占位 subChunkSize  
-        write_i16(ofs, originY);
+        write_u64(ofs, 0); // 占位 subChunkSize    
+        write_i16(ofs, originX);  // 写入 X 坐标  
+        write_i16(ofs, originY);  // 写入 Y 坐标  
+        write_i16(ofs, originZ);  // 写入 Z 坐标  
         write_u32(ofs, regions.size());
 
         for (const auto& region : regions) {
@@ -23,7 +25,6 @@ struct SubChunkUtils {
             write_i16(ofs, region.z2);
         }
 
-        // 回写 subChunkSize  
         std::streampos endPos = ofs.tellp();
         ofs.seekp(startPos);
         write_u64(ofs, static_cast<SubChunkSize>(endPos - startPos));
@@ -32,11 +33,12 @@ struct SubChunkUtils {
     // 从文件读取子区块
     static std::vector<BlockRegion> readSubChunk(std::ifstream& ifs,
         SubChunkSize& subChunkSize,
-        Coord& originY) {
+        Coord& originX, Coord& originY, Coord& originZ) {  // 添加 originX 和 originZ 参数  
         subChunkSize = read_u64(ifs);
-        originY = read_i16(ifs);
+        originX = read_i16(ifs);  // 读取 X 坐标  
+        originY = read_i16(ifs);  // 读取 Y 坐标  
+        originZ = read_i16(ifs);  // 读取 Z 坐标  
         BlockCount regionCount = read_u32(ifs);
-
 
         std::vector<BlockRegion> regions;
         regions.reserve(regionCount);

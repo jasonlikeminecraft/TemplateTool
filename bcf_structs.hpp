@@ -43,7 +43,9 @@ struct BCFHeader {
 // -------------------- 子区块头 --------------------
 struct SubChunkHeader {
     SubChunkSize subChunkSize;
+    Coord originX;  // 新增: X 方向起始坐标  
     Coord originY;
+    Coord originZ;  // 新增: Z 方向起始坐标  
     BlockCount blockRegionCount;  // 改名:区域数量而非组数量  
 
     SubChunkHeader() : subChunkSize(0), originY(0), blockRegionCount(0) {}
