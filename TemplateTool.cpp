@@ -2,46 +2,62 @@
 #include "BCFCachedWriter.hpp"  
 #include "BCFStreamReader.hpp"  
 #include "McstructureToBCF.hpp"
+#include "SchematicToBCF.hpp"
 #include <nbt_tags.h>
 #include <io/stream_reader.h>
+#include <io/izlibstream.h>
+#include <io/ozlibstream.h>
+#include <fstream>  
+
 int main() {
 
 
-    BCFStreamReader reader("output.bcf");
+    SchematicToBCF schematicToBCF("input.schematic", "output.bcf");
 
-    // 获取子区块总数  
-    size_t totalSubChunks = reader.getSubChunkCount();
-    std::cout << "Total sub-chunks: " << totalSubChunks << std::endl;
 
-    // 按需读取指定的子区块  
-    for (size_t i = 0; i < totalSubChunks; i++) {
-        std::vector<BlockRegion> blocks = reader.getBlockRegions(i);
 
-        std::cout << "Sub-chunk " << i << " has " << blocks.size() << " regions\n" ;
 
-        // 处理每个区域  
-        for (const auto& region : blocks) {
-            // 通过 paletteId 获取 PaletteKey  
-            const PaletteKey& pk = reader.getPaletteKey(region.paletteId);
 
-            // 获取方块类型字符串  
-            std::string blockType = reader.getBlockType(pk.typeId);
 
-            //std::cout << "Region at (" << region.x1 << ", " << region.y1 << ", " << region.z1
-            //    << ") to (" << region.x2 << ", " << region.y2 << ", " << region.z2 << "): "
-            //    << blockType << std::endl;
+
+
+    //BCFStreamReader reader("output.bcf");
+
+    //// 获取子区块总数  
+    //size_t totalSubChunks = reader.getSubChunkCount();
+    //std::cout << "Total sub-chunks: " << totalSubChunks << std::endl;
+
+    //// 按需读取指定的子区块  
+    //for (size_t i = 0; i < totalSubChunks; i++) {
+    //    std::vector<BlockRegion> blocks = reader.getBlockRegions(i);
+
+    //    std::cout << "Sub-chunk " << i << " has " << blocks.size() << " regions\n" ;
+
+    //    // 处理每个区域  
+    //    for (const auto& region : blocks) {
+    //        // 通过 paletteId 获取 PaletteKey  
+    //        const PaletteKey& pk = reader.getPaletteKey(region.paletteId);
+
+    //        // 获取方块类型字符串  
+    //        std::string blockType = reader.getBlockType(pk.typeId);
+
+    //        std::cout << "Region at (" << region.x1 << ", " << region.y1 << ", " << region.z1
+    //            << ") to (" << region.x2 << ", " << region.y2 << ", " << region.z2 << "): "
+    //            << blockType << std::endl;
 
           // 访问方块状态    
-            if (!pk.states.empty()) {
-                std::cout << "  States:" << std::endl;
-                for (const auto& [stateId, stateValueId] : pk.states) {
-                    std::string stateName = reader.getStateName(stateId);
-                    std::string stateValue = reader.getStateValue(stateValueId);  // 新增方法  
-                    std::cout << "    " << stateName << ": " << stateValue << std::endl;
-                }
-            }
-        }
-    }
+            //if (!pk.states.empty()) {
+            //    std::cout << "  States:" << std::endl;
+            //    for (const auto& [stateId, stateValueId] : pk.states) {
+            //        std::string stateName = reader.getStateName(stateId);
+            //        std::string stateValue = reader.getStateValue(stateValueId);  // 新增方法  
+            //        std::cout << "    " << stateName << ": " << stateValue << std::endl;
+            //    }
+            //}
+
+       // }
+  //  }
+
 
     //McstructureToBCF mcstructureToBCF("input.mcstructure" ,"output.bcf");
     //mcstructureToBCF.convert();
@@ -73,6 +89,8 @@ int main() {
 
     //std::cout << "BCF file written successfully!" << std::endl;
     //std::cout << "Total blocks written: " << blocCount << std::endl;
+    std::cout << "Press any key to exit..." << std::endl;
+
     std::cin.get();
     return 0;
 }

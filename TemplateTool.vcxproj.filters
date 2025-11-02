@@ -60,6 +60,9 @@
     <ClCompile Include="include\src\value_initializer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="SchematicToBCF.hpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SubChunkUtils.hpp">

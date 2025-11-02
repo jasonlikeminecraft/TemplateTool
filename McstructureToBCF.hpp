@@ -1,5 +1,4 @@
 #pragma once
-#include <mcnbt/mcnbt.hpp>
 #include "BCFCachedWriter.hpp"
 #include <iostream>  
 #include <sstream>  
@@ -8,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <regex>
-
+#include <nbt_tags.h>
 class McstructureToBCF {
 private:
     const std::string m_filename;
@@ -19,179 +18,106 @@ public:
         : m_filename(filename)
         , m_outputFilename(outputFilename)
     {
+        convert();
     }
     void convert() {
-        nbt::Tag structure = nbt::Tag::fromFile(m_filename, false);
+        // 打开文件并读取 NBT 数据(无压缩)  
+        std::ifstream file(m_filename, std::ios::binary);
+        if (!file) {
+            throw std::runtime_error("无法打开文件");
+        }
+
+        auto [rootName, structure] = nbt::io::read_compound(file);
         BCFCachedWriter writer(m_outputFilename);
-        int sizeX = structure["size"][0].getInt();
-        int sizeY = structure["size"][1].getInt();
-        int sizeZ = structure["size"][2].getInt();
+
+        // 读取尺寸信息  
+        auto& sizeList = structure->at("size").as<nbt::tag_list>();
+        int sizeX = static_cast<int32_t>(sizeList.at(0));
+        int sizeY = static_cast<int32_t>(sizeList.at(1));
+        int sizeZ = static_cast<int32_t>(sizeList.at(2));
         int totalBlocks = sizeX * sizeY * sizeZ;
         int yzSize = sizeY * sizeZ;
 
-        nbt::Tag& structureData = structure["structure"];
-        nbt::Tag& blockPalette = structureData["palette"]["default"]["block_palette"];
-        nbt::Tag& blockIndicesTag = structureData["block_indices"][0];
+        // 访问结构数据  
+        auto& structureData = structure->at("structure").as<nbt::tag_compound>();
+        auto& blockPalette = structureData.at("palette")
+            .as<nbt::tag_compound>()
+            .at("default")
+            .as<nbt::tag_compound>()
+            .at("block_palette")
+            .as<nbt::tag_list>();
+
+        auto& blockIndicesTag = structureData.at("block_indices")
+            .as<nbt::tag_list>()
+            .at(0)
+            .as<nbt::tag_int_array>();
+
+        // 复制方块索引  
         std::vector<int> blockIndices(totalBlocks);
         for (int i = 0; i < totalBlocks; ++i) {
-            blockIndices[i] = blockIndicesTag[i].getInt();
+            blockIndices[i] = blockIndicesTag[i];
         }
 
+        // 标记空气方块  
         std::vector<bool> isAirPalette(blockPalette.size(), false);
         for (size_t i = 0; i < blockPalette.size(); ++i) {
-            std::string name = blockPalette[i]["name"].getString();
+            auto& paletteEntry = blockPalette.at(i).as<nbt::tag_compound>();
+            std::string name = static_cast<std::string>(paletteEntry.at("name"));
             if (name.find("air") != std::string::npos) {
                 isAirPalette[i] = true;
             }
         }
 
-
-
+        // 遍历所有方块  
         for (int x = 0; x < sizeX; ++x) {
             for (int y = 0; y < sizeY; ++y) {
                 for (int z = 0; z < sizeZ; ++z) {
                     int index = z + y * sizeZ + x * yzSize;
 
                     int paletteIndex = blockIndices[index];
-                    if (paletteIndex < 0 || paletteIndex >= static_cast<int>(blockPalette.size()) || isAirPalette[paletteIndex]) {
+                    if (paletteIndex < 0 || paletteIndex >= static_cast<int>(blockPalette.size())
+                        || isAirPalette[paletteIndex]) {
                         continue;
                     }
 
-                    nbt::Tag& block = blockPalette[paletteIndex];
-                    std::string blockName = block["name"].getString();
-                    if (block.hasTag("states") && !block["states"].isEmpty()) {
-                        nbt::Tag& states = block["states"];
-                        bool first = true;
-                        std::pair<std::string, std::string> state;
+                    auto& block = blockPalette.at(paletteIndex).as<nbt::tag_compound>();
+                    std::string blockName = static_cast<std::string>(block.at("name"));
+
+                    // 处理方块状态  
+                    if (block.has_key("states")) {
+                        auto& states = block.at("states").as<nbt::tag_compound>();
                         std::vector<std::pair<std::string, std::string>> statesVec;
-                        for (size_t i = 0; i < states.size(); ++i) {
-                            first = false;
 
-                            std::string stateName = states[i].name();
-                            std::string stateValue;
+                        for (const auto& [stateName, stateValue] : states) {
+                            std::string valueStr;
 
-                            switch (states[i].type()) {
-                            case nbt::TT_BYTE:
-                                stateValue = states[i].getByte() ? "true" : "false";
+                            switch (stateValue.get_type()) {
+                            case nbt::tag_type::Byte:
+                                valueStr = static_cast<int8_t>(stateValue) ? "true" : "false";
                                 break;
-                            case nbt::TT_INT:
-                                stateValue = std::to_string(states[i].getInt());
+                            case nbt::tag_type::Int:
+                                valueStr = std::to_string(static_cast<int32_t>(stateValue));
                                 break;
-                            case nbt::TT_STRING:
-                                stateValue = "\"" + states[i].getString() + "\"";
+                            case nbt::tag_type::String:
+                                valueStr = "\"" + static_cast<std::string>(stateValue) + "\"";
                                 break;
                             default:
-                                stateValue = states[i].getString();
+                                valueStr = static_cast<std::string>(stateValue);
                                 break;
                             }
-                            state.first = stateName;
-                            state.second = stateValue;
-                            statesVec.push_back(state);
+
+                            statesVec.push_back({ stateName, valueStr });
                         }
                         writer.addBlock(x, y, z, blockName, statesVec);
                     }
-                    writer.addBlock(x, y, z, blockName, {});
+                    else {
+                        writer.addBlock(x, y, z, blockName, {});
+                    }
                 }
             }
         }
         writer.finalize();
     }
-
 };
-static std::vector<std::string> generateSetblockCommands(const std::string& filename) {
-
-    std::vector<std::string> commands;
-
-    nbt::Tag structure = nbt::Tag::fromFile(filename, false);
-
-
-    int sizeX = structure["size"][0].getInt();
-    int sizeY = structure["size"][1].getInt();
-    int sizeZ = structure["size"][2].getInt();
-    int totalBlocks = sizeX * sizeY * sizeZ;
-    int yzSize = sizeY * sizeZ;
-
-
-    commands.reserve(totalBlocks);
-
-
-    nbt::Tag& structureData = structure["structure"];
-    nbt::Tag& blockPalette = structureData["palette"]["default"]["block_palette"];
-    nbt::Tag& blockIndicesTag = structureData["block_indices"][0];
-
-
-    std::vector<int> blockIndices(totalBlocks);
-    for (int i = 0; i < totalBlocks; ++i) {
-        blockIndices[i] = blockIndicesTag[i].getInt();
-    }
-
-
-    std::vector<bool> isAirPalette(blockPalette.size(), false);
-    for (size_t i = 0; i < blockPalette.size(); ++i) {
-        std::string name = blockPalette[i]["name"].getString();
-        if (name.find("air") != std::string::npos) {
-            isAirPalette[i] = true;
-        }
-    }
-
-
-    for (int x = 0; x < sizeX; ++x) {
-        for (int y = 0; y < sizeY; ++y) {
-            for (int z = 0; z < sizeZ; ++z) {
-                int index = z + y * sizeZ + x * yzSize;
-
-                int paletteIndex = blockIndices[index];
-                if (paletteIndex < 0 || paletteIndex >= static_cast<int>(blockPalette.size()) || isAirPalette[paletteIndex]) {
-                    continue;
-                }
-
-                nbt::Tag& block = blockPalette[paletteIndex];
-                std::string blockName = block["name"].getString();
-
-
-                std::string cmd = "setblock ~" + std::to_string(x) + " ~" + std::to_string(y) + " ~" + std::to_string(z) + " " + blockName;
-
-
-                if (block.hasTag("states") && !block["states"].isEmpty()) {
-                    nbt::Tag& states = block["states"];
-                    cmd += "[";
-                    bool first = true;
-
-                    for (size_t i = 0; i < states.size(); ++i) {
-                        if (!first) cmd += ",";
-                        first = false;
-
-                        std::string stateName = states[i].name();
-                        std::string stateValue;
-
-                        switch (states[i].type()) {
-                        case nbt::TT_BYTE:
-                            stateValue = states[i].getByte() ? "true" : "false";
-                            break;
-                        case nbt::TT_INT:
-                            stateValue = std::to_string(states[i].getInt());
-                            break;
-                        case nbt::TT_STRING:
-                            stateValue = "\"" + states[i].getString() + "\"";
-                            break;
-                        default:
-                            stateValue = states[i].getString();
-                            break;
-                        }
-
-                        cmd += "\"" + stateName + "\"=" + stateValue;
-                    }
-
-                    cmd += "]";
-                }
-
-
-                commands.push_back(std::move(cmd));
-            }
-        }
-    }
-
-    return commands;
-}
 
 

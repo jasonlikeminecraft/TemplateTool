@@ -154,6 +154,7 @@
     <ClCompile Include="include\src\text\json_formatter.cpp" />
     <ClCompile Include="include\src\value.cpp" />
     <ClCompile Include="include\src\value_initializer.cpp" />
+    <ClCompile Include="SchematicToBCF.hpp" />
     <ClCompile Include="TemplateTool.cpp" />
   </ItemGroup>
   <ItemGroup>

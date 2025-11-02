@@ -31,7 +31,7 @@ struct BCFHeader {
     FilePos stateValueMapOffset;  // 新增字段  
   
     BCFHeader()  
-        : version(2), width(160), length(160), height(376),  // 版本改为 2  
+        : version(2), width(144), length(144), height(376),  // 版本改为 2  
         subChunkBaseSize(376), subChunkCount(0),
         subChunkOffsetsTableOffset(0),  // 新增字段  
         paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0)  , stateValueMapOffset(0)
