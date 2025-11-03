@@ -1,41 +1,62 @@
-#pragma once  
-#include "bcf_structs.hpp"  
-#include <map>  
-#include <tuple>  
-#include <vector>  
+#pragma once
+#include "bcf_structs.hpp"
+#include <unordered_map>
+#include <unordered_set>
+#include <tuple>
+#include <vector>
+#include <cstdint>
 
 struct RegionMergeUtils {
-    // ½« BlockGroup ºÏ²¢³É BlockRegion  
-    static std::vector<BlockRegion> mergeToRegions(
-        const std::vector<BlockGroup>& groups) {
 
+    // åæ ‡é”®ç±»å‹
+    using Key = std::tuple<Coord, Coord, Coord>;
+
+    // é«˜æ•ˆä¸‰ç»´åæ ‡å“ˆå¸Œ
+    struct KeyHash {
+        std::size_t operator()(const Key& k) const noexcept {
+            auto [x, y, z] = k;
+            // ä½¿ç”¨è´¨æ•°æ··åˆé¿å…åæ ‡èšé›†å¯¼è‡´å“ˆå¸Œç¢°æ’
+            return static_cast<std::size_t>(
+                (x * 73856093) ^ (y * 19349663) ^ (z * 83492791)
+            );
+        }
+    };
+
+    static std::vector<BlockRegion> mergeToRegions(
+        const std::vector<BlockGroup>& groups)
+    {
         std::vector<BlockRegion> regions;
 
-        // °´ paletteId ·Ö×é¹¹½¨ 3D Íø¸ñ  
-        std::map<PaletteID, std::map<std::tuple<Coord, Coord, Coord>, bool>> grids;
+        // paletteId â†’ è¯¥ç±»å‹çš„æ–¹å—åæ ‡é›†åˆ
+        std::unordered_map<PaletteID, std::unordered_set<Key, KeyHash>> grids;
+        grids.reserve(groups.size());
 
+        // æ„å»ºåæ ‡å“ˆå¸Œè¡¨
         for (const auto& bg : groups) {
+            auto& grid = grids[bg.paletteId];
+            grid.reserve(bg.count);
             for (size_t i = 0; i < bg.count; i++) {
-                grids[bg.paletteId][{bg.x[i], bg.y[i], bg.z[i]}] = true;
+                grid.emplace(bg.x[i], bg.y[i], bg.z[i]);
             }
         }
 
-        // ¶ÔÃ¿¸ö paletteId ½øĞĞÌ°ĞÄºÏ²¢  
+        // éå†æ¯ä¸ª paletteId çš„æ–¹å—é›†åˆ
         for (auto& [paletteId, grid] : grids) {
             while (!grid.empty()) {
+                // å–ç¬¬ä¸€ä¸ªæ–¹å—ä½œä¸ºèµ·ç‚¹
                 auto it = grid.begin();
-                auto [x, y, z] = it->first;
+                auto [x, y, z] = *it;
 
-                // Ïò X ·½ÏòÀ©Õ¹  
+                // X å‘æ‰©å±•
                 Coord maxX = x;
-                while (grid.count({ maxX + 1, y, z })) maxX++;
+                while (grid.count({maxX + 1, y, z})) maxX++;
 
-                // Ïò Z ·½ÏòÀ©Õ¹  
+                // Z å‘æ‰©å±•
                 Coord maxZ = z;
                 bool canExpandZ = true;
                 while (canExpandZ) {
                     for (Coord cx = x; cx <= maxX; cx++) {
-                        if (!grid.count({ cx, y, maxZ + 1 })) {
+                        if (!grid.count({cx, y, maxZ + 1})) {
                             canExpandZ = false;
                             break;
                         }
@@ -43,13 +64,13 @@ struct RegionMergeUtils {
                     if (canExpandZ) maxZ++;
                 }
 
-                // Ïò Y ·½ÏòÀ©Õ¹  
+                // Y å‘æ‰©å±•
                 Coord maxY = y;
                 bool canExpandY = true;
                 while (canExpandY) {
                     for (Coord cx = x; cx <= maxX; cx++) {
                         for (Coord cz = z; cz <= maxZ; cz++) {
-                            if (!grid.count({ cx, maxY + 1, cz })) {
+                            if (!grid.count({cx, maxY + 1, cz})) {
                                 canExpandY = false;
                                 break;
                             }
@@ -59,18 +80,18 @@ struct RegionMergeUtils {
                     if (canExpandY) maxY++;
                 }
 
-                // ´´½¨ÇøÓò  
+                // æ·»åŠ åˆå¹¶åŒºåŸŸ
                 BlockRegion region;
                 region.paletteId = paletteId;
                 region.x1 = x; region.y1 = y; region.z1 = z;
                 region.x2 = maxX; region.y2 = maxY; region.z2 = maxZ;
                 regions.push_back(region);
 
-                // ÒÆ³ıÒÑ·ÃÎÊµÄ·½¿é  
+                // ç§»é™¤å·²åˆå¹¶æ–¹å—
                 for (Coord cy = y; cy <= maxY; cy++) {
                     for (Coord cx = x; cx <= maxX; cx++) {
                         for (Coord cz = z; cz <= maxZ; cz++) {
-                            grid.erase({ cx, cy, cz });
+                            grid.erase({cx, cy, cz});
                         }
                     }
                 }
