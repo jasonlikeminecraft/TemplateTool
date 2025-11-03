@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <regex>
 #include <nbt_tags.h>
+
 class McstructureToBCF {
 private:
     const std::string m_filename;
@@ -21,16 +22,16 @@ public:
         convert();
     }
     void convert() {
-        // ´ò¿ªÎÄ¼ş²¢¶ÁÈ¡ NBT Êı¾İ(ÎŞÑ¹Ëõ)  
+        // æ‰“å¼€æ–‡ä»¶å¹¶è¯»å– NBT æ•°æ®(æ— å‹ç¼©)  
         std::ifstream file(m_filename, std::ios::binary);
         if (!file) {
-            throw std::runtime_error("ÎŞ·¨´ò¿ªÎÄ¼ş");
+            throw std::runtime_error("æ— æ³•æ‰“å¼€æ–‡ä»¶");
         }
 
         auto [rootName, structure] = nbt::io::read_compound(file);
         BCFCachedWriter writer(m_outputFilename);
 
-        // ¶ÁÈ¡³ß´çĞÅÏ¢  
+        // è¯»å–å°ºå¯¸ä¿¡æ¯  
         auto& sizeList = structure->at("size").as<nbt::tag_list>();
         int sizeX = static_cast<int32_t>(sizeList.at(0));
         int sizeY = static_cast<int32_t>(sizeList.at(1));
@@ -38,7 +39,7 @@ public:
         int totalBlocks = sizeX * sizeY * sizeZ;
         int yzSize = sizeY * sizeZ;
 
-        // ·ÃÎÊ½á¹¹Êı¾İ  
+        // è®¿é—®ç»“æ„æ•°æ®  
         auto& structureData = structure->at("structure").as<nbt::tag_compound>();
         auto& blockPalette = structureData.at("palette")
             .as<nbt::tag_compound>()
@@ -52,13 +53,13 @@ public:
             .at(0)
             .as<nbt::tag_int_array>();
 
-        // ¸´ÖÆ·½¿éË÷Òı  
+        // å¤åˆ¶æ–¹å—ç´¢å¼•  
         std::vector<int> blockIndices(totalBlocks);
         for (int i = 0; i < totalBlocks; ++i) {
             blockIndices[i] = blockIndicesTag[i];
         }
 
-        // ±ê¼Ç¿ÕÆø·½¿é  
+        // æ ‡è®°ç©ºæ°”æ–¹å—  
         std::vector<bool> isAirPalette(blockPalette.size(), false);
         for (size_t i = 0; i < blockPalette.size(); ++i) {
             auto& paletteEntry = blockPalette.at(i).as<nbt::tag_compound>();
@@ -68,7 +69,7 @@ public:
             }
         }
 
-        // ±éÀúËùÓĞ·½¿é  
+        // éå†æ‰€æœ‰æ–¹å—  
         for (int x = 0; x < sizeX; ++x) {
             for (int y = 0; y < sizeY; ++y) {
                 for (int z = 0; z < sizeZ; ++z) {
@@ -83,7 +84,7 @@ public:
                     auto& block = blockPalette.at(paletteIndex).as<nbt::tag_compound>();
                     std::string blockName = static_cast<std::string>(block.at("name"));
 
-                    // ´¦Àí·½¿é×´Ì¬  
+                    // å¤„ç†æ–¹å—çŠ¶æ€  
                     if (block.has_key("states")) {
                         auto& states = block.at("states").as<nbt::tag_compound>();
                         std::vector<std::pair<std::string, std::string>> statesVec;
