@@ -96,5 +96,10 @@ struct BlockRegion {
     Coord x1, y1, z1;  // 起始坐标  
     Coord x2, y2, z2;  // 结束坐标  
 };
+struct SubChunkOrigin {  
+    Coord originX;  
+    Coord originY;  
+    Coord originZ;  
+};  
 
 #pragma pack(pop)
