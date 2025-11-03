@@ -149,23 +149,22 @@ public:
     
     size_t getSubChunkCount() const { return subChunkOffsets.size(); }    
     // 在 BCFStreamReader 中添加:  
-    std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) {
-        std::vector<BlockRegion> result;
-        if (subChunkIndex >= subChunkOffsets.size()) return result;
-
-        if (!cachedStream.is_open()) {
-            cachedStream.open(filename, std::ios::binary);
-            if (!cachedStream) {
-                throw std::runtime_error("Failed to reopen file for streaming");
-            }
-        }
-
-        cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);
-        SubChunkSize sz;
-        Coord oy;
-        return SubChunkUtils::readSubChunk(cachedStream, sz, oy);  // 直接返回 BlockRegion  
-    }
-
+std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) {  
+    std::vector<BlockRegion> result;  
+    if (subChunkIndex >= subChunkOffsets.size()) return result;  
+  
+    if (!cachedStream.is_open()) {  
+        cachedStream.open(filename, std::ios::binary);  
+        if (!cachedStream) {  
+            throw std::runtime_error("Failed to reopen file for streaming");  
+        }  
+    }  
+  
+    cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);  
+    SubChunkSize sz;  
+    Coord ox, oy, oz;  
+    return SubChunkUtils::readSubChunk(cachedStream, sz, ox, oy, oz);  
+}
 
     const PaletteKey& getPaletteKey(PaletteID paletteId) const {
         if (paletteId >= paletteList.size()) {
