@@ -195,6 +195,40 @@ std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) {
         }
         return it->second;
     }
+
+
+// 获取指定 subchunk 的起始坐标  
+
+  
+SubChunkOrigin getSubChunkOrigin(size_t subChunkIndex) {  
+    SubChunkOrigin origin;  
+    if (subChunkIndex >= subChunkOffsets.size()) {  
+        origin.originX = 0;  
+        origin.originY = 0;  
+        origin.originZ = 0;  
+        return origin;  
+    }  
+  
+    if (!cachedStream.is_open()) {  
+        cachedStream.open(filename, std::ios::binary);  
+        if (!cachedStream) {  
+            throw std::runtime_error("Failed to reopen file for streaming");  
+        }  
+    }  
+  
+    // 跳转到 subchunk 位置  
+    cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);  
+      
+    // 读取 subChunkSize (跳过)  
+    read_u64(cachedStream);  
+      
+    // 读取三个坐标  
+    origin.originX = read_i16(cachedStream);  
+    origin.originY = read_i16(cachedStream);  
+    origin.originZ = read_i16(cachedStream);  
+      
+    return origin;  
+}
     // 析构函数确保文件流关闭  
     ~BCFStreamReader() {  
         if (cachedStream.is_open()) {  
