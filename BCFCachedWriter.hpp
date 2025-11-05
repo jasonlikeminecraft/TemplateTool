@@ -265,6 +265,14 @@ private:
         for (const auto& [index, cacheFile] : subChunkCacheFiles) {
             subChunkOffsets.push_back(ofs.tellp());
 
+
+            // 计算当前 subchunk 的起始坐标  
+            int subChunkX = index % (width / 64);
+            int subChunkZ = index / (width / 64);
+            Coord originX = static_cast<Coord>(subChunkX * 64);
+            Coord originY = static_cast<Coord>(index * 16);
+            Coord originZ = static_cast<Coord>(subChunkZ * 64);
+
             // 读取所有片段  
             std::ifstream ifs(cacheFile, std::ios::binary);
             if (!ifs) {
@@ -286,11 +294,10 @@ private:
             allGroups = MergeUtils::mergeBlockGroups(allGroups);
 
             // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion  
-            auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups);
+            auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups,144,376,144);
 
-            // 写入到最终文件 (使用新的 BlockRegion 格式)  
-            Coord originY = static_cast<Coord>(index * 16);
-            SubChunkUtils::writeSubChunk(ofs, mergedRegions, originY);
+            // 传递三个坐标参数  
+            SubChunkUtils::writeSubChunk(ofs, mergedRegions, originX, originY, originZ);
         }
 
         // 写入偏移量表  

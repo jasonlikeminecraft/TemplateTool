@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <atomic>
+#include <bit>
 
 struct RegionMergeUtils {
     static constexpr int BITS_PER_SEG = 64;
@@ -84,7 +85,7 @@ private:
                 for (int seg = 0; seg < grid.xSegments; seg++) {
                     uint64_t bits = grid.data[(size_t(y) * L + z) * grid.xSegments + seg];
                     while (bits) {
-                        int bitIndex = __builtin_ctzll(bits);
+                        int bitIndex = std::countr_zero(bits);
                         bits &= bits - 1; // 清除最低位的1
                         Coord x = seg * BITS_PER_SEG + bitIndex;
                         if (x >= W || !grid.test(x, y, z)) continue;

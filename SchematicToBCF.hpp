@@ -501,7 +501,7 @@ public:
                         if (blockId != 0  ) { // 0 通常是空气
                             std::string blockName = blockIdToName[blockId];
                             if (blockName.empty()) {
-                                std::cout << "未知的方块 ID: " << std::to_string(blockId) << std::endl;
+                                //std::cout << "未知的方块 ID: " << std::to_string(blockId) << std::endl;
                                 continue;
                             }
                             writer.addBlock(x, y, z, blockName, { {"tileData", std::to_string(blockData)} });
@@ -509,7 +509,9 @@ public:
                     }
                 }
             }
+            std::cout << "转换完成!" << std::endl;
             writer.finalize();
+            std::cout << "写入文件完成!" << std::endl;
         }
         catch (const nbt::io::input_error& e) {
             std::cerr << "读取错误: " << e.what() << std::endl;

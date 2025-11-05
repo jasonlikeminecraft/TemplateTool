@@ -21,6 +21,8 @@ int main() {
 
 
 
+
+
     //BCFStreamReader reader("output.bcf");
 
     //// 获取子区块总数  
