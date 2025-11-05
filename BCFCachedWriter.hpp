@@ -91,7 +91,7 @@ public:
           
         // 添加到对应的 sub-chunk  
         auto& subChunk = activeSubChunks[subChunkIndex];  
-        addBlockToGroup(subChunk, paletteId, x, localY, z);  
+        addBlockToGroup(subChunk, paletteId, localX, localY, localZ);
           
         // 优化: 批量 flush 策略  
         checkAndFlush();  
@@ -293,7 +293,7 @@ private:
             allGroups = MergeUtils::mergeBlockGroups(allGroups);
 
             // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion  
-            auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups,144,376,144);
+            auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups);
 
             // 传递三个坐标参数  
             SubChunkUtils::writeSubChunk(ofs, mergedRegions, originX, originY, originZ);
