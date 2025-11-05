@@ -266,13 +266,12 @@ private:
             subChunkOffsets.push_back(ofs.tellp());
 
 
-            // 计算当前 subchunk 的起始坐标  
-            int subChunkX = index % (width / 64);
-            int subChunkZ = index / (width / 64);
-            Coord originX = static_cast<Coord>(subChunkX * 64);
-            Coord originY = static_cast<Coord>(index * 16);
-            Coord originZ = static_cast<Coord>(subChunkZ * 64);
-
+// 计算当前 subchunk 的起始坐标  
+            int subChunkX = index % (width / 144);
+            int subChunkZ = index / (width / 144);
+            Coord originX = static_cast<Coord>(subChunkX * 144);
+            Coord originY = static_cast<Coord>(0);  // y 不分割,始终从 0 开始  
+            Coord originZ = static_cast<Coord>(subChunkZ * 144);
             // 读取所有片段  
             std::ifstream ifs(cacheFile, std::ios::binary);
             if (!ifs) {
