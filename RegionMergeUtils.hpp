@@ -1,219 +1,143 @@
 #pragma once
 #include "bcf_structs.hpp"
-#include <unordered_map>
-#include <unordered_set>
-#include <tuple>
 #include <vector>
-#include <algorithm>
-#include <thread>
+#include <unordered_map>
 #include <future>
-#include <array>
-#include <cmath>
+#include <cstdint>
+#include <algorithm>
+#include <atomic>
 
 struct RegionMergeUtils {
-    using EncodedKey = uint64_t;
+    static constexpr int BITS_PER_SEG = 64;
 
-    struct CoordRange {
-        int xMin, xMax;
-        int yMin, yMax;
-        int zMin, zMax;
+    struct BitmaskGrid {
+        PaletteID paletteId;
+        int width, height, length;
+        int xSegments; // width / 64
+        std::vector<uint64_t> data;
 
-        int xBits, yBits, zBits;
-        uint64_t xMask, yMask, zMask;
-
-        void init(int xm, int xM, int ym, int yM, int zm, int zM) {
-            xMin = xm; xMax = xM;
-            yMin = ym; yMax = yM;
-            zMin = zm; zMax = zM;
-
-            xBits = std::ceil(std::log2(xMax - xMin + 1));
-            yBits = std::ceil(std::log2(yMax - yMin + 1));
-            zBits = std::ceil(std::log2(zMax - zMin + 1));
-
-            xMask = ((uint64_t)1 << xBits) - 1;
-            yMask = ((uint64_t)1 << yBits) - 1;
-            zMask = ((uint64_t)1 << zBits) - 1;
+        BitmaskGrid(int w, int h, int l, PaletteID pid)
+            : paletteId(pid), width(w), height(h), length(l)
+        {
+            xSegments = (w + BITS_PER_SEG - 1) / BITS_PER_SEG;
+            data.resize(size_t(h) * l * xSegments, 0);
         }
 
-        inline EncodedKey encode(Coord x, Coord y, Coord z) const noexcept {
-            return ((uint64_t)(x - xMin) & xMask) << (yBits + zBits) |
-                   ((uint64_t)(y - yMin) & yMask) << zBits |
-                   ((uint64_t)(z - zMin) & zMask);
+        inline void set(Coord x, Coord y, Coord z) {
+            size_t idx = (size_t(y) * length + z) * xSegments + (x / BITS_PER_SEG);
+            data[idx] |= (1ULL << (x % BITS_PER_SEG));
         }
 
-        inline std::tuple<Coord, Coord, Coord> decode(EncodedKey key) const noexcept {
-            Coord z = key & zMask;
-            Coord y = (key >> zBits) & yMask;
-            Coord x = (key >> (yBits + zBits)) & xMask;
-            return { x + xMin, y + yMin, z + zMin };
+        inline bool test(Coord x, Coord y, Coord z) const {
+            size_t idx = (size_t(y) * length + z) * xSegments + (x / BITS_PER_SEG);
+            return (data[idx] >> (x % BITS_PER_SEG)) & 1ULL;
+        }
+
+        inline void clear(Coord x, Coord y, Coord z) {
+            size_t idx = (size_t(y) * length + z) * xSegments + (x / BITS_PER_SEG);
+            data[idx] &= ~(1ULL << (x % BITS_PER_SEG));
         }
     };
 
     static std::vector<BlockRegion> mergeToRegions(
-        const std::vector<BlockGroup>& groups)
+        const std::vector<BlockGroup>& groups,
+        int width, int height, int length)
     {
-        std::vector<BlockRegion> regions;
-        std::unordered_map<PaletteID, std::unordered_set<EncodedKey>> grids;
+        std::unordered_map<PaletteID, BitmaskGrid> grids;
         grids.reserve(groups.size());
 
-        // 先扫描坐标范围
-        CoordRange range{ INT_MAX, INT_MIN, INT_MAX, INT_MIN, INT_MAX, INT_MIN };
-        for (auto& bg : groups) {
-            for (size_t i = 0; i < bg.count; i++) {
-                range.xMin = std::min(range.xMin, bg.x[i]);
-                range.xMax = std::max(range.xMax, bg.x[i]);
-                range.yMin = std::min(range.yMin, bg.y[i]);
-                range.yMax = std::max(range.yMax, bg.y[i]);
-                range.zMin = std::min(range.zMin, bg.z[i]);
-                range.zMax = std::max(range.zMax, bg.z[i]);
-            }
-        }
-        range.init(range.xMin, range.xMax, range.yMin, range.yMax, range.zMin, range.zMax);
-
-        // 构建整数哈希集合
+        // Step 1: 构建 palette → bitmask 映射
         for (const auto& bg : groups) {
-            auto& grid = grids[bg.paletteId];
-            grid.reserve(bg.count);
+            auto& grid = grids.try_emplace(bg.paletteId, width, height, length, bg.paletteId).first->second;
             for (size_t i = 0; i < bg.count; i++)
-                grid.insert(range.encode(bg.x[i], bg.y[i], bg.z[i]));
+                grid.set(bg.x[i], bg.y[i], bg.z[i]);
         }
 
-        // 6 种扩展顺序
-        static const std::array<std::array<int, 3>, 6> orders = {{
-            {0,1,2}, {0,2,1}, {1,0,2}, {1,2,0}, {2,0,1}, {2,1,0}
-        }};
+        // Step 2: 多线程并行合并
+        std::vector<BlockRegion> allRegions;
+        std::mutex resultMutex;
+        std::vector<std::future<void>> tasks;
 
         for (auto& [paletteId, grid] : grids) {
-            while (!grid.empty()) {
-                auto it = grid.begin();
-                auto [x, y, z] = range.decode(*it);
-
-                BlockRegion best;
-
-                if (grid.size() > 5000) {
-                    std::array<std::future<BlockRegion>, 6> futures;
-                    for (int i = 0; i < 6; i++)
-                        futures[i] = std::async(std::launch::async,
-                            [&grid, x, y, z, paletteId, &orders, &range, i]() {
-                                return tryExpansion(grid, x, y, z, paletteId, orders[i], range);
-                            });
-
-                    int maxVolume = 0;
-                    for (int i = 0; i < 6; i++) {
-                        BlockRegion candidate = futures[i].get();
-                        int vol = (candidate.x2 - candidate.x1 + 1) *
-                                  (candidate.y2 - candidate.y1 + 1) *
-                                  (candidate.z2 - candidate.z1 + 1);
-                        if (vol > maxVolume) { maxVolume = vol; best = candidate; }
-                    }
-                } else {
-                    int maxVolume = 0;
-                    for (int i = 0; i < 6; i++) {
-                        BlockRegion candidate = tryExpansion(grid, x, y, z, paletteId, orders[i], range);
-                        int vol = (candidate.x2 - candidate.x1 + 1) *
-                                  (candidate.y2 - candidate.y1 + 1) *
-                                  (candidate.z2 - candidate.z1 + 1);
-                        if (vol > maxVolume) { maxVolume = vol; best = candidate; }
-                    }
-                }
-
-                regions.push_back(best);
-                removeRegion(grid, best, range);
-            }
-        }
-
-        return regions;
-    }
-
-private:
-    static bool has(const std::unordered_set<EncodedKey>& grid, Coord x, Coord y, Coord z, const CoordRange& range) noexcept {
-        return grid.count(range.encode(x, y, z));
-    }
-
-    static BlockRegion tryExpansion(
-        const std::unordered_set<EncodedKey>& grid,
-        Coord x, Coord y, Coord z,
-        PaletteID pid,
-        const std::array<int,3>& order,
-        const CoordRange& range)
-    {
-        BlockRegion r{pid,x,x,y,y,z,z};
-        for (int axis : order) {
-            if (axis==0) expandX(grid,r,range);
-            else if(axis==1) expandZ(grid,r,range);
-            else expandY(grid,r,range);
-        }
-        return r;
-    }
-
-    static void expandX(const std::unordered_set<EncodedKey>& grid, BlockRegion& r, const CoordRange& range) {
-        while(true){
-            Coord nx = r.x2+1;
-            for(Coord cy=r.y1;cy<=r.y2;cy++) for(Coord cz=r.z1;cz<=r.z2;cz++)
-                if(!has(grid,nx,cy,cz,range)) return;
-            r.x2 = nx;
-        }
-    }
-
-    static void expandZ(const std::unordered_set<EncodedKey>& grid, BlockRegion& r, const CoordRange& range){
-        while(true){
-            Coord nz = r.z2+1;
-            for(Coord cx=r.x1;cx<=r.x2;cx++) for(Coord cy=r.y1;cy<=r.y2;cy++)
-                if(!has(grid,cx,cy,nz,range)) return;
-            r.z2 = nz;
-        }
-    }
-
-    static void expandY(const std::unordered_set<EncodedKey>& grid, BlockRegion& r, const CoordRange& range){
-        while(true){
-            Coord ny = r.y2+1;
-            for(Coord cx=r.x1;cx<=r.x2;cx++) for(Coord cz=r.z1;cz<=r.z2;cz++)
-                if(!has(grid,cx,ny,cz,range)) return;
-            r.y2 = ny;
-        }
-    }
-
-static void removeRegion(std::unordered_set<EncodedKey>& grid, const BlockRegion& r, const CoordRange& range){
-    size_t toRemove = (r.x2-r.x1+1)*(r.y2-r.y1+1)*(r.z2-r.z1+1);
-    if(toRemove > grid.size()/4){ // 超大块时并行删除
-        std::vector<EncodedKey> keysToRemove;
-        keysToRemove.reserve(toRemove);
-        for(Coord cy=r.y1; cy<=r.y2; cy++)
-            for(Coord cx=r.x1; cx<=r.x2; cx++)
-                for(Coord cz=r.z1; cz<=r.z2; cz++)
-                    keysToRemove.push_back(range.encode(cx,cy,cz));
-
-        size_t numThreads = std::thread::hardware_concurrency();
-        if(numThreads==0) numThreads=4;
-        size_t chunkSize = (keysToRemove.size() + numThreads - 1) / numThreads;
-
-        std::vector<std::future<void>> futures;
-        for(size_t t=0; t<numThreads; t++){
-            size_t start = t*chunkSize;
-            size_t end = std::min(start+chunkSize, keysToRemove.size());
-            if(start>=end) break;
-            futures.push_back(std::async(std::launch::async, [&grid, &keysToRemove, start, end](){
-                for(size_t i=start; i<end; i++)
-                    grid.erase(keysToRemove[i]);
+            tasks.push_back(std::async(std::launch::async, [&grid, &allRegions, &resultMutex]() {
+                std::vector<BlockRegion> local;
+                local.reserve(1024);
+                mergeSingleGrid(grid, local);
+                std::scoped_lock lock(resultMutex);
+                allRegions.insert(allRegions.end(), local.begin(), local.end());
             }));
         }
 
-        for(auto& f : futures) f.get();
-    } else if(toRemove > grid.size()/2){
-        // 删除大半表，重建哈希表更高效
-        std::unordered_set<EncodedKey> newGrid;
-        newGrid.reserve(grid.size() - toRemove);
-        for(auto key:grid){
-            auto [x,y,z]=range.decode(key);
-            if(x<r.x1||x>r.x2||y<r.y1||y>r.y2||z<r.z1||z>r.z2)
-                newGrid.insert(key);
-        }
-        grid.swap(newGrid);
-    } else {
-        // 小块，直接删除
-        for(Coord cy=r.y1; cy<=r.y2; cy++)
-            for(Coord cx=r.x1; cx<=r.x2; cx++)
-                for(Coord cz=r.z1; cz<=r.z2; cz++)
-                    grid.erase(range.encode(cx,cy,cz));
+        for (auto& f : tasks) f.get();
+        return allRegions;
     }
-}
+
+private:
+    static void mergeSingleGrid(BitmaskGrid& grid, std::vector<BlockRegion>& regions)
+    {
+        const int W = grid.width;
+        const int H = grid.height;
+        const int L = grid.length;
+
+        for (int y = 0; y < H; y++) {
+            for (int z = 0; z < L; z++) {
+                for (int seg = 0; seg < grid.xSegments; seg++) {
+                    uint64_t bits = grid.data[(size_t(y) * L + z) * grid.xSegments + seg];
+                    while (bits) {
+                        int bitIndex = __builtin_ctzll(bits);
+                        bits &= bits - 1; // 清除最低位的1
+                        Coord x = seg * BITS_PER_SEG + bitIndex;
+                        if (x >= W || !grid.test(x, y, z)) continue;
+
+                        // X方向扩展
+                        Coord x2 = x;
+                        while (x2 + 1 < W && grid.test(x2 + 1, y, z)) x2++;
+
+                        // Z方向扩展
+                        Coord z2 = z;
+                        bool canExpandZ = true;
+                        while (canExpandZ && z2 + 1 < L) {
+                            for (Coord cx = x; cx <= x2; cx++) {
+                                if (!grid.test(cx, y, z2 + 1)) {
+                                    canExpandZ = false;
+                                    break;
+                                }
+                            }
+                            if (canExpandZ) z2++;
+                        }
+
+                        // Y方向扩展
+                        Coord y2 = y;
+                        bool canExpandY = true;
+                        while (canExpandY && y2 + 1 < H) {
+                            for (Coord cz = z; cz <= z2; cz++) {
+                                for (Coord cx = x; cx <= x2; cx++) {
+                                    if (!grid.test(cx, y2 + 1, cz)) {
+                                        canExpandY = false;
+                                        goto stopY;
+                                    }
+                                }
+                            }
+                            y2++;
+                        }
+                    stopY:;
+
+                        // 添加 region
+                        BlockRegion region;
+                        region.paletteId = grid.paletteId;
+                        region.x1 = x; region.x2 = x2;
+                        region.y1 = y; region.y2 = y2;
+                        region.z1 = z; region.z2 = z2;
+                        regions.push_back(region);
+
+                        // 清除已处理区域
+                        for (Coord cy = y; cy <= y2; cy++)
+                            for (Coord cz = z; cz <= z2; cz++)
+                                for (Coord cx = x; cx <= x2; cx++)
+                                    grid.clear(cx, cy, cz);
+                    }
+                }
+            }
+        }
+    }
+};
