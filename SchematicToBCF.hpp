@@ -1,22 +1,25 @@
-#pragma once
-#include "BCFCachedWriter.hpp"
-#include <nbt_tags.h>
-#include <io/stream_reader.h>
-#include <io/izlibstream.h>
-#include <io/ozlibstream.h>
-#include <iostream>  
-#include <sstream>  
-#include <fstream>
-#include <vector>
-#include <string>
-#include <unordered_map>
-#include <regex>
-class SchematicToBCF {
-private:
-    const std::string m_filename;
-    const std::string m_outputFilename;
-    std::unordered_map<int, std::string> blockIdToName = {
-    {151, "daylight_detector"},
+
+#pragma once  
+#include "BCFCachedWriter.hpp"  
+#include <nbt_tags.h>  
+#include <io/stream_reader.h>  
+#include <io/izlibstream.h>  
+#include <io/ozlibstream.h>  
+#include <iostream>    
+#include <sstream>    
+#include <fstream>  
+#include <vector>  
+#include <string>  
+#include <unordered_map>  
+  
+class SchematicToBCF {  
+private:  
+    const std::string m_filename;  
+    const std::string m_outputFilename;  
+      
+    // ä¿æŒåŸæœ‰çš„ blockIdToName æ˜ å°„è¡¨  
+    std::unordered_map<int, std::string> blockIdToName = {  
+       {151, "daylight_detector"},
     {541, "chain"},
     {505, "crimson_standing_sign"},
     {208, "grass_path"},
@@ -453,75 +456,103 @@ private:
     {354, "cake"},
     {355, "bed"},
     };
-public:
-
-    SchematicToBCF(const std::string& filename, const std::string& outputFilename)
-        : m_filename(filename)
-        , m_outputFilename(outputFilename)
-    {
-        convert();
-    }
-    void convert() {
-        std::ifstream file(m_filename, std::ios::binary);
-        if (!file) {
-            std::cerr << "ÎŞ·¨´ò¿ªÎÄ¼ş" << std::endl;
-            return;
-        }
-        BCFCachedWriter writer(m_outputFilename);
-        try {
-            // Èç¹ûÊÇÑ¹ËõÎÄ¼ş,Ê¹ÓÃ izlibstream  
-            zlib::izlibstream gzstream(file);
-            auto [name, schematic] = nbt::io::read_compound(gzstream);
-
-            // ¶ÁÈ¡³ß´ç  
-            int16_t width = static_cast<int16_t>(schematic->at("Width"));
-            int16_t height = static_cast<int16_t>(schematic->at("Height"));
-            int16_t length = static_cast<int16_t>(schematic->at("Length"));
-
-            // ·ÃÎÊ Blocks Êı×é  
-            auto& blocks = schematic->at("Blocks").as<nbt::tag_byte_array>();
-            std::cout << "·½¿éÊı×é´óĞ¡: " << blocks.size() << std::endl;
-
-            // ·ÃÎÊ Data Êı×é  
-            auto& data = schematic->at("Data").as<nbt::tag_byte_array>();
-            std::cout << "Êı¾İÊı×é´óĞ¡: " << data.size() << std::endl;
-            
-            // ±éÀúËùÓĞ·½¿é  
-            for (int y = 0; y < height; ++y) {
-                for (int z = 0; z < length; ++z) {
-                    for (int x = 0; x < width; ++x) {
-                        // Schematic Ê¹ÓÃ YZX Ë³Ğò´æ´¢  
-                        int index = x + (z * width) + (y * width * length);
-
-                        // »ñÈ¡·½¿é ID ºÍÊı¾İÖµ  
-                        int8_t blockId = blocks[index];
-                        int8_t blockData = data[index];
-
-                        // ´¦Àí·½¿é...  
-                        if (blockId != 0  ) { // 0 Í¨³£ÊÇ¿ÕÆø
-                            std::string blockName = blockIdToName[blockId];
-                            if (blockName.empty()) {
-                                //std::cout << "Î´ÖªµÄ·½¿é ID: " << std::to_string(blockId) << std::endl;
-                                continue;
-                            }
-                            writer.addBlock(x, y, z, blockName, { {"tileData", std::to_string(blockData)} });
-                        }
-                    }
-                }
-            }
-            std::cout << "×ª»»Íê³É!" << std::endl;
-            writer.finalize();
-            std::cout << "Ğ´ÈëÎÄ¼şÍê³É!" << std::endl;
-        }
-        catch (const nbt::io::input_error& e) {
-            std::cerr << "¶ÁÈ¡´íÎó: " << e.what() << std::endl;
-            return;
-        }
-        catch (const std::bad_cast& e) {
-            std::cerr << "ÀàĞÍ×ª»»´íÎó: " << e.what() << std::endl;
-            return;
-        }
-    }
+  
+public:  
+    SchematicToBCF(const std::string& filename, const std::string& outputFilename)  
+        : m_filename(filename)  
+        , m_outputFilename(outputFilename)  
+    {  
+        convert();  
+    }  
+      
+    void convert() {  
+        std::ifstream file(m_filename, std::ios::binary);  
+        if (!file) {  
+            std::cerr << "æ— æ³•æ‰“å¼€æ–‡ä»¶" << std::endl;  
+            return;  
+        }  
+          
+        // ä¼˜åŒ– 3: å¢åŠ å†…å­˜é˜ˆå€¼åˆ° 50000  
+        BCFCachedWriter writer(m_outputFilename, "./temp_bcf_cache", 50000);  
+          
+        try {  
+            // è¯»å–å¹¶è§£å‹ç¼©æ–‡ä»¶  
+            zlib::izlibstream gzstream(file);  
+            auto [name, schematic] = nbt::io::read_compound(gzstream);  
+  
+            // è·å–å°ºå¯¸  
+            int16_t width = static_cast<int16_t>(schematic->at("Width"));  
+            int16_t height = static_cast<int16_t>(schematic->at("Height"));  
+            int16_t length = static_cast<int16_t>(schematic->at("Length"));  
+  
+            // è¯»å– Blocks æ•°ç»„  
+            auto& blocks = schematic->at("Blocks").as<nbt::tag_byte_array>();  
+            std::cout << "æ–¹å—æ•°ç»„å¤§å°: " << blocks.size() << std::endl;  
+  
+            // è¯»å– Data æ•°ç»„  
+            auto& data = schematic->at("Data").as<nbt::tag_byte_array>();  
+            std::cout << "æ•°æ®æ•°ç»„å¤§å°: " << data.size() << std::endl;  
+              
+            // ä¼˜åŒ– 2: é¢„å…ˆæ„å»ºç©ºæ°”æ–¹å—è¿‡æ»¤å™¨  
+            std::vector<bool> isAirBlock(256, false);  
+            isAirBlock[0] = true;  // ç©ºæ°”æ–¹å— ID  
+              
+            // ä¼˜åŒ– 4: é¢„å…ˆæ„å»ºæ–¹å—åç§°ç¼“å­˜  
+            std::vector<std::string> blockNameCache(256);  
+            for (const auto& [id, name] : blockIdToName) {  
+                if (id >= 0 && id < 256) {  
+                    blockNameCache[id] = name;  
+                }  
+            }  
+              
+            // ä¼˜åŒ– 1: é¢„åˆ†é…çŠ¶æ€å‘é‡  
+            std::vector<std::pair<std::string, std::string>> states;  
+            states.reserve(1);  
+              
+            // é¢„å…ˆç¼“å­˜ "tileData" å­—ç¬¦ä¸²  
+            const std::string tileDataKey = "tileData";  
+              
+            // éå†æ‰€æœ‰æ–¹å— (ä¿æŒ YZX é¡ºåºä»¥æé«˜ç©ºé—´å±€éƒ¨æ€§)  
+            for (int y = 0; y < height; ++y) {  
+                for (int z = 0; z < length; ++z) {  
+                    for (int x = 0; x < width; ++x) {  
+                        // Schematic ä½¿ç”¨ YZX é¡ºåºå­˜å‚¨  
+                        int index = x + (z * width) + (y * width * length);  
+  
+                        // è·å–æ–¹å— ID å’Œæ•°æ®å€¼  
+                        int8_t blockId = blocks[index];  
+                        int8_t blockData = data[index];  
+  
+                        // ä¼˜åŒ– 2: ä½¿ç”¨é¢„æ„å»ºçš„ç©ºæ°”è¿‡æ»¤å™¨  
+                        if (blockId >= 0 && blockId < 256 && !isAirBlock[blockId]) {  
+                            // ä¼˜åŒ– 4: ä½¿ç”¨é¢„æ„å»ºçš„æ–¹å—åç§°ç¼“å­˜  
+                            const std::string& blockName = blockNameCache[blockId];  
+                              
+                            if (blockName.empty()) {  
+                                continue;  // è·³è¿‡æœªçŸ¥æ–¹å—  
+                            }  
+                              
+                            // ä¼˜åŒ– 1: é‡ç”¨çŠ¶æ€å‘é‡,ä½¿ç”¨ move è¯­ä¹‰  
+                            states.clear();  
+                            states.emplace_back(tileDataKey, std::to_string(blockData));  
+                            writer.addBlock(x, y, z, blockName, std::move(states));  
+                        }  
+                    }  
+                }  
+            }  
+              
+            std::cout << "è½¬æ¢å®Œæˆ!" << std::endl;  
+            writer.finalize();  
+            std::cout << "å†™å…¥æ–‡ä»¶å®Œæˆ!" << std::endl;  
+        }  
+        catch (const nbt::io::input_error& e) {  
+            std::cerr << "è¯»å–é”™è¯¯: " << e.what() << std::endl;  
+            return;  
+        }  
+        catch (const std::bad_cast& e) {  
+            std::cerr << "ç±»å‹è½¬æ¢é”™è¯¯: " << e.what() << std::endl;  
+            return;  
+        }  
+    }  
 };
-
 
