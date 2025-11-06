@@ -22,6 +22,12 @@ private:
     uint16_t length = 144;  // z 方向尺寸  
     uint16_t height = 376; // y 方向尺寸 (320 - (-56) = 376)  
     int minY = -56;        // 最小 y 坐标  
+// 新增: 动态边界追踪  
+int minX = std::numeric_limits<int>::max();  
+int maxX = std::numeric_limits<int>::min();  
+int minZ = std::numeric_limits<int>::max();  
+int maxZ = std::numeric_limits<int>::min();  
+bool hasBounds = false;  // 标记是否已有方块数据
 
     // 元数据  
     std::vector<PaletteKey> paletteList;  
@@ -63,39 +69,61 @@ public:
         height(worldHeight), minY(worldMinY) {
         std::filesystem::create_directories(tempDir);
     }
-    // 添加方块 - 自动管理 sub-chunk  
-    void addBlock(int x, int y, int z,   
-                  const std::string& blockType,  
-                  const std::vector<std::pair<std::string, std::string>>& states = {}) {  
-        // 新设计: x-z 平面按 64×64 分块, y 方向不分块  
-        int subChunkIndexX = x / 144;
-        int subChunkIndexZ = z / 144;
-        int subChunkIndex = subChunkIndexZ * (width / 144) + subChunkIndexX;  // 二维索引  
-
-        int localX = x % 144;
-        int localZ = z % 144;
-        int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]
-          
-        // 获取或创建 IDs (使用优化的 O(1) 查找)  
-        BlockTypeID typeId = getOrCreateTypeId(blockType);  
-          
-        PaletteKey key;  
-        key.typeId = typeId;  
-        for (const auto& [stateName, stateValue] : states) {
-            BlockStateID stateId = getOrCreateStateId(stateName);
-            StateValueID valueId = getOrCreateStateValue(stateValue);  // 新增  
-            key.states.push_back({ stateId, valueId });
-        }
-          
-        PaletteID paletteId = getOrCreatePaletteId(key);  
-          
-        // 添加到对应的 sub-chunk  
-        auto& subChunk = activeSubChunks[subChunkIndex];  
-        addBlockToGroup(subChunk, paletteId, localX, localY, localZ);
-          
-        // 优化: 批量 flush 策略  
-        checkAndFlush();  
+void addBlock(int x, int y, int z,     
+              const std::string& blockType,    
+              const std::vector<std::pair<std::string, std::string>>& states = {}) {    
+      
+    // 动态更新边界  
+    if (!hasBounds) {  
+        minX = maxX = x;  
+        minZ = maxZ = z;  
+        hasBounds = true;  
+    } else {  
+        minX = std::min(minX, x);  
+        maxX = std::max(maxX, x);  
+        minZ = std::min(minZ, z);  
+        maxZ = std::max(maxZ, z);  
     }  
+  
+    // 计算相对于边界的坐标  
+    int relativeX = x - minX;  
+    int relativeZ = z - minZ;  
+  
+    // 计算当前的世界尺寸 (向上取整到 144 的倍数)  
+    int currentWidth = maxX - minX + 1;  
+    int currentLength = maxZ - minZ + 1;  
+    int subChunkCountX = (currentWidth + 143) / 144;  
+  
+    // 使用相对坐标计算 sub-chunk 索引  
+    int subChunkIndexX = relativeX / 144;  
+    int subChunkIndexZ = relativeZ / 144;  
+    int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;  
+  
+    // 计算局部坐标 (相对于 sub-chunk)  
+    int localX = relativeX % 144;  
+    int localZ = relativeZ % 144;  
+    int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]  
+        
+    // 获取或创建 IDs (使用优化的 O(1) 查找)    
+    BlockTypeID typeId = getOrCreateTypeId(blockType);    
+        
+    PaletteKey key;    
+    key.typeId = typeId;    
+    for (const auto& [stateName, stateValue] : states) {  
+        BlockStateID stateId = getOrCreateStateId(stateName);  
+        StateValueID valueId = getOrCreateStateValue(stateValue);  
+        key.states.push_back({ stateId, valueId });  
+    }  
+        
+    PaletteID paletteId = getOrCreatePaletteId(key);    
+        
+    // 添加到对应的 sub-chunk    
+    auto& subChunk = activeSubChunks[subChunkIndex];    
+    addBlockToGroup(subChunk, paletteId, localX, localY, localZ);  
+        
+    // 优化: 批量 flush 策略    
+    checkAndFlush();    
+}
       
     // 完成写入  
     void finalize() {  
@@ -248,117 +276,124 @@ private:
         subChunkCacheFiles[subChunkIndex] = cacheFile;  
     }  
       
-    // 优化: 流式合并,每次只处理一个子区块  
-    void mergeAllCacheFiles() {
-        std::ofstream ofs(outputFilename, std::ios::binary);
-        if (!ofs) {
-            throw std::runtime_error("Failed to create output file: " + outputFilename);
-        }
-
-        // 写入占位符 header  
-        BCFHeader header;
-        write_le<BCFHeader>(ofs, header);
-
-        // 按顺序处理所有 sub-chunk  
-        std::vector<FilePos> subChunkOffsets;
-
-        for (const auto& [index, cacheFile] : subChunkCacheFiles) {
-            subChunkOffsets.push_back(ofs.tellp());
-
-
-// 计算当前 subchunk 的起始坐标  
-            int subChunkX = index % (width / 144);
-            int subChunkZ = index / (width / 144);
-            Coord originX = static_cast<Coord>(subChunkX * 144);
-            Coord originY = static_cast<Coord>(0);  // y 不分割,始终从 0 开始  
-            Coord originZ = static_cast<Coord>(subChunkZ * 144);
-            // 读取所有片段  
-            std::ifstream ifs(cacheFile, std::ios::binary);
-            if (!ifs) {
-                throw std::runtime_error("Failed to read cache file: " + cacheFile);
-            }
-
-            std::vector<BlockGroup> allGroups;
-
-            // 读取所有片段并收集  
-            while (ifs.peek() != EOF) {
-                uint32_t groupCount = read_u32(ifs);
-                for (uint32_t i = 0; i < groupCount; i++) {
-                    allGroups.push_back(BlockUtils::readBlockGroup(ifs));
-                }
-            }
-            ifs.close();
-
-            // 先合并相同 paletteId 的 BlockGroup  
-            allGroups = MergeUtils::mergeBlockGroups(allGroups);
-
-            // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion  
-            auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups);
-
-            // 传递三个坐标参数  
-            SubChunkUtils::writeSubChunk(ofs, mergedRegions, originX, originY, originZ);
-        }
-
-        // 写入偏移量表  
-        FilePos offsetTablePos = ofs.tellp();
-        write_u64(ofs, subChunkOffsets.size());
-        for (auto offset : subChunkOffsets) {
-            write_u64(ofs, offset);
-        }
-
-        // 写入 palette  
-        FilePos palettePos = ofs.tellp();
-        write_u32(ofs, static_cast<uint32_t>(paletteList.size()));
-        for (size_t pid = 0; pid < paletteList.size(); pid++) {
-            const auto& k = paletteList[pid];
-            write_u32(ofs, static_cast<uint32_t>(pid));
-            write_u16(ofs, k.typeId);
-            write_u16(ofs, static_cast<uint16_t>(k.states.size()));
-            for (const auto& s : k.states) {
-                write_u8(ofs, s.first);
-                write_u8(ofs, s.second);
-            }
-        }
-
-        // 写入 type map  
-        FilePos typeMapPos = ofs.tellp();
-        write_u32(ofs, static_cast<uint32_t>(typeMap.size()));
-        for (const auto& kv : typeMap) {
-            write_u16(ofs, kv.first);
-            writeString16(ofs, kv.second);
-        }
-
-        // 写入 state map  
-        FilePos stateMapPos = ofs.tellp();
-        write_u32(ofs, static_cast<uint32_t>(stateMap.size()));
-        for (const auto& kv : stateMap) {
-            write_u8(ofs, kv.first);
-            writeString16(ofs, kv.second);
-        }
-
-        // 写入 state value map  
-        FilePos stateValueMapPos = ofs.tellp();
-        write_u32(ofs, static_cast<uint32_t>(stateValueMap.size()));
-        for (const auto& kv : stateValueMap) {
-            write_u8(ofs, kv.first);
-            writeString16(ofs, kv.second);
-        }
-
-        // 更新 header 时添加新的偏移量字段  
-        header.stateValueMapOffset = stateValueMapPos;  // 需要在 BCFHeader 
-
-        // 更新 header (版本升级到 3)  
-        header.version = 3;  // 新版本支持 BlockRegion  
-        header.subChunkCount = subChunkOffsets.size();
-        header.subChunkOffsetsTableOffset = offsetTablePos;
-        header.paletteOffset = palettePos;
-        header.blockTypeMapOffset = typeMapPos;
-        header.stateNameMapOffset = stateMapPos;
-
-        ofs.seekp(0);
-        write_le<BCFHeader>(ofs, header);
-        ofs.close();
-    }
+void mergeAllCacheFiles() {  
+    std::ofstream ofs(outputFilename, std::ios::binary);  
+    if (!ofs) {  
+        throw std::runtime_error("Failed to create output file: " + outputFilename);  
+    }  
+  
+    // 计算最终的世界尺寸  
+    int finalWidth = hasBounds ? (maxX - minX + 1) : 144;  
+    int finalLength = hasBounds ? (maxZ - minZ + 1) : 144;  
+    int subChunkCountX = (finalWidth + 143) / 144;  
+  
+    // 写入占位符 header    
+    BCFHeader header;  
+    header.width = static_cast<uint16_t>(finalWidth);  
+    header.length = static_cast<uint16_t>(finalLength);  
+    header.height = height;  
+    write_le<BCFHeader>(ofs, header);  
+  
+    // 按顺序处理所有 sub-chunk    
+    std::vector<FilePos> subChunkOffsets;  
+  
+    for (const auto& [index, cacheFile] : subChunkCacheFiles) {  
+        subChunkOffsets.push_back(ofs.tellp());  
+  
+        // 计算当前 subchunk 的起始坐标 (使用动态边界)  
+        int subChunkX = index % subChunkCountX;  
+        int subChunkZ = index / subChunkCountX;  
+        Coord originX = static_cast<Coord>(minX + subChunkX * 144);  
+        Coord originY = static_cast<Coord>(minY);  // 修复: 使用 minY 而不是 0  
+        Coord originZ = static_cast<Coord>(minZ + subChunkZ * 144);  
+          
+        // 读取所有片段    
+        std::ifstream ifs(cacheFile, std::ios::binary);  
+        if (!ifs) {  
+            throw std::runtime_error("Failed to read cache file: " + cacheFile);  
+        }  
+  
+        std::vector<BlockGroup> allGroups;  
+  
+        // 读取所有片段并收集    
+        while (ifs.peek() != EOF) {  
+            uint32_t groupCount = read_u32(ifs);  
+            for (uint32_t i = 0; i < groupCount; i++) {  
+                allGroups.push_back(BlockUtils::readBlockGroup(ifs));  
+            }  
+        }  
+        ifs.close();  
+  
+        // 先合并相同 paletteId 的 BlockGroup    
+        allGroups = MergeUtils::mergeBlockGroups(allGroups);  
+  
+        // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion    
+        auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups);  
+  
+        // 传递三个坐标参数    
+        SubChunkUtils::writeSubChunk(ofs, mergedRegions, originX, originY, originZ);  
+    }  
+  
+    // 写入偏移量表    
+    FilePos offsetTablePos = ofs.tellp();  
+    write_u64(ofs, subChunkOffsets.size());  
+    for (auto offset : subChunkOffsets) {  
+        write_u64(ofs, offset);  
+    }  
+  
+    // 写入 palette    
+    FilePos palettePos = ofs.tellp();  
+    write_u32(ofs, static_cast<uint32_t>(paletteList.size()));  
+    for (size_t pid = 0; pid < paletteList.size(); pid++) {  
+        const auto& k = paletteList[pid];  
+        write_u32(ofs, static_cast<uint32_t>(pid));  
+        write_u16(ofs, k.typeId);  
+        write_u16(ofs, static_cast<uint16_t>(k.states.size()));  
+        for (const auto& s : k.states) {  
+            write_u8(ofs, s.first);  
+            write_u8(ofs, s.second);  
+        }  
+    }  
+  
+    // 写入 type map    
+    FilePos typeMapPos = ofs.tellp();  
+    write_u32(ofs, static_cast<uint32_t>(typeMap.size()));  
+    for (const auto& kv : typeMap) {  
+        write_u16(ofs, kv.first);  
+        writeString16(ofs, kv.second);  
+    }  
+  
+    // 写入 state map    
+    FilePos stateMapPos = ofs.tellp();  
+    write_u32(ofs, static_cast<uint32_t>(stateMap.size()));  
+    for (const auto& kv : stateMap) {  
+        write_u8(ofs, kv.first);  
+        writeString16(ofs, kv.second);  
+    }  
+  
+    // 写入 state value map    
+    FilePos stateValueMapPos = ofs.tellp();  
+    write_u32(ofs, static_cast<uint32_t>(stateValueMap.size()));  
+    for (const auto& kv : stateValueMap) {  
+        write_u8(ofs, kv.first);  
+        writeString16(ofs, kv.second);  
+    }  
+  
+    // 更新 header 时添加新的偏移量字段    
+    header.stateValueMapOffset = stateValueMapPos;  
+  
+    // 更新 header (版本升级到 3)    
+    header.version = 3;  
+    header.subChunkCount = subChunkOffsets.size();  
+    header.subChunkOffsetsTableOffset = offsetTablePos;  
+    header.paletteOffset = palettePos;  
+    header.blockTypeMapOffset = typeMapPos;  
+    header.stateNameMapOffset = stateMapPos;  
+  
+    ofs.seekp(0);  
+    write_le<BCFHeader>(ofs, header);  
+    ofs.close();  
+}
     void cleanup() {  
         // 删除所有临时文件  
         for (const auto& [index, cacheFile] : subChunkCacheFiles) {  
