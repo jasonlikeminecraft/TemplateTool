@@ -1,0 +1,4 @@
+format_version
+size
+structure
+structure_world_origin

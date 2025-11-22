@@ -44,6 +44,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -117,6 +118,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <WholeProgramOptimization>true</WholeProgramOptimization>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +135,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -158,6 +161,8 @@
     <ClCompile Include="TemplateTool.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="McfunctionToBCF.hpp" />
+    <ClInclude Include="BlockStateConverter.hpp" />
     <ClInclude Include="BCFCachedWriter.hpp" />
     <ClInclude Include="BCFStreamReader.hpp" />
     <ClInclude Include="BCFUtils.hpp" />
@@ -210,9 +215,14 @@
     <ClInclude Include="include\text\json_formatter.h" />
     <ClInclude Include="include\value.h" />
     <ClInclude Include="include\value_initializer.h" />
+    <ClInclude Include="LitematicToBCF.hpp" />
     <ClInclude Include="McstructureToBCF.hpp" />
     <ClInclude Include="RegionMergeUtils.hpp" />
+    <ClInclude Include="SchemToBCF.hpp" />
     <ClInclude Include="SubChunkUtils.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="snbt_convert.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

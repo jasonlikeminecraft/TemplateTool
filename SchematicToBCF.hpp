@@ -11,14 +11,14 @@
 #include <vector>  
 #include <string>  
 #include <unordered_map>  
-  
-class SchematicToBCF {  
-private:  
-    const std::string m_filename;  
-    const std::string m_outputFilename;  
-      
+
+class SchematicToBCF {
+private:
+    const std::string m_filename;
+    const std::string m_outputFilename;
+
     // 保持原有的 blockIdToName 映射表  
-    std::unordered_map<int, std::string> blockIdToName = {  
+    std::unordered_map<int, std::string> blockIdToName = {
        {151, "daylight_detector"},
     {541, "chain"},
     {505, "crimson_standing_sign"},
@@ -456,103 +456,102 @@ private:
     {354, "cake"},
     {355, "bed"},
     };
-  
-public:  
-    SchematicToBCF(const std::string& filename, const std::string& outputFilename)  
-        : m_filename(filename)  
-        , m_outputFilename(outputFilename)  
-    {  
-        convert();  
-    }  
-      
-    void convert() {  
-        std::ifstream file(m_filename, std::ios::binary);  
-        if (!file) {  
-            std::cerr << "无法打开文件" << std::endl;  
-            return;  
-        }  
-          
-        // 优化 3: 增加内存阈值到 50000  
-        BCFCachedWriter writer(m_outputFilename, "./temp_bcf_cache", 50000);  
-          
-        try {  
-            // 读取并解压缩文件  
-            zlib::izlibstream gzstream(file);  
-            auto [name, schematic] = nbt::io::read_compound(gzstream);  
-  
-            // 获取尺寸  
-            int16_t width = static_cast<int16_t>(schematic->at("Width"));  
-            int16_t height = static_cast<int16_t>(schematic->at("Height"));  
-            int16_t length = static_cast<int16_t>(schematic->at("Length"));  
-  
-            // 读取 Blocks 数组  
-            auto& blocks = schematic->at("Blocks").as<nbt::tag_byte_array>();  
-            std::cout << "方块数组大小: " << blocks.size() << std::endl;  
-  
-            // 读取 Data 数组  
-            auto& data = schematic->at("Data").as<nbt::tag_byte_array>();  
-            std::cout << "数据数组大小: " << data.size() << std::endl;  
-              
-            // 优化 2: 预先构建空气方块过滤器  
-            std::vector<bool> isAirBlock(256, false);  
-            isAirBlock[0] = true;  // 空气方块 ID  
-              
-            // 优化 4: 预先构建方块名称缓存  
-            std::vector<std::string> blockNameCache(256);  
-            for (const auto& [id, name] : blockIdToName) {  
-                if (id >= 0 && id < 256) {  
-                    blockNameCache[id] = name;  
-                }  
-            }  
-              
-            // 优化 1: 预分配状态向量  
-            std::vector<std::pair<std::string, std::string>> states;  
-            states.reserve(1);  
-              
-            // 预先缓存 "tileData" 字符串  
-            const std::string tileDataKey = "tileData";  
-              
-            // 遍历所有方块 (保持 YZX 顺序以提高空间局部性)  
-            for (int y = 0; y < height; ++y) {  
-                for (int z = 0; z < length; ++z) {  
-                    for (int x = 0; x < width; ++x) {  
-                        // Schematic 使用 YZX 顺序存储  
-                        int index = x + (z * width) + (y * width * length);  
-  
-                        // 获取方块 ID 和数据值  
-                        int8_t blockId = blocks[index];  
-                        int8_t blockData = data[index];  
-  
-                        // 优化 2: 使用预构建的空气过滤器  
-                        if (blockId >= 0 && blockId < 256 && !isAirBlock[blockId]) {  
-                            // 优化 4: 使用预构建的方块名称缓存  
-                            const std::string& blockName = blockNameCache[blockId];  
-                              
-                            if (blockName.empty()) {  
-                                continue;  // 跳过未知方块  
-                            }  
-                              
-                            // 优化 1: 重用状态向量,使用 move 语义  
-                            states.clear();  
-                            states.emplace_back(tileDataKey, std::to_string(blockData));  
-                            writer.addBlock(x, y, z, blockName, std::move(states));  
-                        }  
-                    }  
-                }  
-            }  
-              
-            std::cout << "转换完成!" << std::endl;  
-            writer.finalize();  
-            std::cout << "写入文件完成!" << std::endl;  
-        }  
-        catch (const nbt::io::input_error& e) {  
-            std::cerr << "读取错误: " << e.what() << std::endl;  
-            return;  
-        }  
-        catch (const std::bad_cast& e) {  
-            std::cerr << "类型转换错误: " << e.what() << std::endl;  
-            return;  
-        }  
-    }  
-};
 
+public:
+    SchematicToBCF(const std::string& filename, const std::string& outputFilename)
+        : m_filename(filename)
+        , m_outputFilename(outputFilename)
+    {
+        convert();
+    }
+
+    void convert() {
+        std::ifstream file(m_filename, std::ios::binary);
+        if (!file) {
+            std::cerr << "无法打开文件" << std::endl;
+            return;
+        }
+
+        // 优化 3: 增加内存阈值到 50000  
+        BCFCachedWriter writer(m_outputFilename, "./temp_bcf_cache", 50000);
+
+        try {
+            // 读取并解压缩文件  
+            zlib::izlibstream gzstream(file);
+            auto [name, schematic] = nbt::io::read_compound(gzstream);
+
+            // 获取尺寸  
+            int16_t width = static_cast<int16_t>(schematic->at("Width"));
+            int16_t height = static_cast<int16_t>(schematic->at("Height"));
+            int16_t length = static_cast<int16_t>(schematic->at("Length"));
+
+            // 读取 Blocks 数组  
+            auto& blocks = schematic->at("Blocks").as<nbt::tag_byte_array>();
+            std::cout << "方块数组大小: " << blocks.size() << std::endl;
+
+            // 读取 Data 数组  
+            auto& data = schematic->at("Data").as<nbt::tag_byte_array>();
+            std::cout << "数据数组大小: " << data.size() << std::endl;
+
+            // 优化 2: 预先构建空气方块过滤器  
+            std::vector<bool> isAirBlock(256, false);
+            isAirBlock[0] = true;  // 空气方块 ID  
+
+            // 优化 4: 预先构建方块名称缓存  
+            std::vector<std::string> blockNameCache(256);
+            for (const auto& [id, name] : blockIdToName) {
+                if (id >= 0 && id < 256) {
+                    blockNameCache[id] = name;
+                }
+            }
+
+            // 优化 1: 预分配状态向量  
+            std::vector<std::pair<std::string, std::string>> states;
+            states.reserve(1);
+
+            // 预先缓存 "tileData" 字符串  
+            const std::string tileDataKey = "tileData";
+
+            // 遍历所有方块 (保持 YZX 顺序以提高空间局部性)  
+            for (int y = 0; y < height; ++y) {
+                for (int z = 0; z < length; ++z) {
+                    for (int x = 0; x < width; ++x) {
+                        // Schematic 使用 YZX 顺序存储  
+                        int index = x + (z * width) + (y * width * length);
+
+                        // 获取方块 ID 和数据值  
+                        int8_t blockId = blocks[index];
+                        int8_t blockData = data[index];
+
+                        // 优化 2: 使用预构建的空气过滤器  
+                        if (blockId >= 0 && blockId < 256 && !isAirBlock[blockId]) {
+                            // 优化 4: 使用预构建的方块名称缓存  
+                            const std::string& blockName = blockNameCache[blockId];
+
+                            if (blockName.empty()) {
+                                continue;  // 跳过未知方块  
+                            }
+
+                            // 优化 1: 重用状态向量,使用 move 语义  
+                            states.clear();
+                            states.emplace_back(tileDataKey, std::to_string(blockData));
+                            writer.addBlock(x, y, z, blockName, std::move(states));
+                        }
+                    }
+                }
+            }
+
+            std::cout << "转换完成!" << std::endl;
+            writer.finalize();
+            std::cout << "写入文件完成!" << std::endl;
+        }
+        catch (const nbt::io::input_error& e) {
+            std::cerr << "读取错误: " << e.what() << std::endl;
+            return;
+        }
+        catch (const std::bad_cast& e) {
+            std::cerr << "类型转换错误: " << e.what() << std::endl;
+            return;
+        }
+    }
+};

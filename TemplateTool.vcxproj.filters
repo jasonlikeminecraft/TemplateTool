@@ -230,5 +230,20 @@
     <ClInclude Include="include\nbt_export.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="LitematicToBCF.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SchemToBCF.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BlockStateConverter.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="McfunctionToBCF.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="snbt_convert.txt" />
   </ItemGroup>
 </Project>

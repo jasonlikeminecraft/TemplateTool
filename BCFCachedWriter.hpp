@@ -12,6 +12,14 @@
 #include <unordered_map>  
 #include <algorithm>  
   
+
+struct BlockData {
+    int x, y, z;
+    std::string blockType;
+    std::vector<std::pair<std::string, std::string>> states;
+};
+
+
 class BCFCachedWriter {  
 private:  
     std::string outputFilename;  
@@ -140,6 +148,51 @@ void addBlock(int x, int y, int z,
         cleanup();  
     }  
       
+
+    void addBlocks(std::vector<BlockData>& blocks) {
+        for (auto& block : blocks) {
+            // 内联 addBlock 逻辑以避免函数调用开销  
+            if (!hasBounds) {
+                minX = maxX = block.x;
+                minZ = maxZ = block.z;
+                hasBounds = true;
+            }
+            else {
+                minX = std::min(minX, block.x);
+                maxX = std::max(maxX, block.x);
+                minZ = std::min(minZ, block.z);
+                maxZ = std::max(maxZ, block.z);
+            }
+
+            int relativeX = block.x - minX;
+            int relativeZ = block.z - minZ;
+            int currentWidth = maxX - minX + 1;
+            int subChunkCountX = (currentWidth + 143) / 144;
+            int subChunkIndexX = relativeX / 144;
+            int subChunkIndexZ = relativeZ / 144;
+            int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;
+            int localX = relativeX % 144;
+            int localZ = relativeZ % 144;
+            int localY = block.z + 56;
+
+            BlockTypeID typeId = getOrCreateTypeId(block.blockType);
+            PaletteKey key;
+            key.typeId = typeId;
+            for (const auto& [stateName, stateValue] : block.states) {
+                BlockStateID stateId = getOrCreateStateId(stateName);
+                StateValueID valueId = getOrCreateStateValue(stateValue);
+                key.states.push_back({ stateId, valueId });
+            }
+            PaletteID paletteId = getOrCreatePaletteId(key);
+
+            auto& subChunk = activeSubChunks[subChunkIndex];
+            addBlockToGroup(subChunk, paletteId, localX, localY, localZ);
+        }
+
+        // 批量检查一次  
+        checkAndFlush();
+    }
+
     ~BCFCachedWriter() {  
         if (!activeSubChunks.empty() || !subChunkCacheFiles.empty()) {  
             cleanup();  
@@ -416,5 +469,8 @@ void mergeAllCacheFiles() {
           
         subChunkCacheFiles.clear();  
     }  
+
+
+
 };
 

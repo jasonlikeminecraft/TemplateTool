@@ -27,8 +27,8 @@ public:
         if (!file) {
             throw std::runtime_error("无法打开文件");
         }
+        auto [rootName, structure] = nbt::io::read_compound(file,endian::little);
 
-        auto [rootName, structure] = nbt::io::read_compound(file);
         BCFCachedWriter writer(m_outputFilename);
 
         // 读取尺寸信息  
@@ -48,15 +48,14 @@ public:
             .at("block_palette")
             .as<nbt::tag_list>();
 
-        auto& blockIndicesTag = structureData.at("block_indices")
+        auto& blockIndicesList = structureData.at("block_indices")
             .as<nbt::tag_list>()
             .at(0)
-            .as<nbt::tag_int_array>();
-
+            .as<nbt::tag_list>();
         // 复制方块索引  
         std::vector<int> blockIndices(totalBlocks);
         for (int i = 0; i < totalBlocks; ++i) {
-            blockIndices[i] = blockIndicesTag[i];
+            blockIndices[i] = blockIndicesList[i].as<nbt::tag_int>();
         }
 
         // 标记空气方块  
