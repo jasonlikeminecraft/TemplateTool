@@ -51,10 +51,10 @@ private:
         std::string command;
         iss >> command;
 
-        if (command == "setblock") {
+        if (command == "setblock" || command == "/setblock") {
             parseSetblock(iss, writer);
         }
-        else if (command == "fill") {
+        else if (command == "fill" || command == "/fill") {
             parseFill(iss, writer);
         }
         // ºöÂÔÆäËûÖ¸Áî  
