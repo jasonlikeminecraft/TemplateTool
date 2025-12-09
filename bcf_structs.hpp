@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <nbt_tags.h>  
 #include <vector>
 #include <string>
 
@@ -18,28 +19,31 @@ using StatePair = std::pair<BlockStateID, StateValueID>;
 #pragma pack(push,1)
 // -------------------- 文件头 --------------------
 
-struct BCFHeader {  
-    char magic[3];           // "BCF"  
-    Version version;         // 版本 2 支持偏移量表  
+// 扩展 BCFHeader，版本升级到 4  
+struct BCFHeader {    
+    char magic[3];  
+    Version version;         // 版本 4 支持 NBT 数据    
     uint16_t width, length, height;  
     uint8_t subChunkBaseSize;  
     FilePos subChunkCount;  
-    FilePos subChunkOffsetsTableOffset;  // 新增:子区块偏移量表位置  
+    FilePos subChunkOffsetsTableOffset;  
     FilePos paletteOffset;  
     FilePos blockTypeMapOffset;  
     FilePos stateNameMapOffset;  
-    FilePos stateValueMapOffset;  // 新增字段  
-  
+    FilePos stateValueMapOffset;  
+    FilePos nbtDataOffset;   // NBT 数据偏移量（预留）  
+    
     BCFHeader()  
-        : version(2), width(144), length(144), height(376),  // 版本改为 2  
-        subChunkBaseSize(376), subChunkCount(0),
-        subChunkOffsetsTableOffset(0),  // 新增字段  
-        paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0)  , stateValueMapOffset(0)
-    {  
-        magic[0] = 'B'; magic[1] = 'C'; magic[2] = 'F';  
-    }  
-};
-
+        : version(4), width(144), length(144), height(376),  
+        subChunkBaseSize(376), subChunkCount(0),  
+        subChunkOffsetsTableOffset(0),    
+        paletteOffset(0), blockTypeMapOffset(0), stateNameMapOffset(0), stateValueMapOffset(0),  
+        nbtDataOffset(0)  
+    {    
+        magic[0] = 'B'; magic[1] = 'C'; magic[2] = 'F';    
+    }    
+};  
+  
 // -------------------- 子区块头 --------------------
 struct SubChunkHeader {
     SubChunkSize subChunkSize;
@@ -59,28 +63,46 @@ struct BlockGroup {
 };
 
 // -------------------- PaletteKey --------------------
-struct PaletteKey {
-    BlockTypeID typeId;
-    std::vector<StatePair> states;
 
-    bool operator==(const PaletteKey& o) const {
-        if (typeId != o.typeId || states.size() != o.states.size()) return false;
-        for (size_t i = 0; i < states.size(); ++i)
-            if (states[i] != o.states[i]) return false;
-        return true;
-    }
-};
+// 扩展 PaletteKey，使用libnbt++的tag_compound_ptr  
+struct PaletteKey {  
+    BlockTypeID typeId;  
+    std::vector<StatePair> states;  
+    nbt::tag_compound_ptr nbtData;  // 使用libnbt++的智能指针类型  
+  
+    bool operator==(const PaletteKey& o) const {  
+        if (typeId != o.typeId || states.size() != o.states.size()) return false;  
+          
+        // 比较NBT数据  
+        if ((nbtData == nullptr) != (o.nbtData == nullptr)) return false;  
+        if (nbtData && o.nbtData && !nbtData->equals(*o.nbtData)) return false;  
+          
+        for (size_t i = 0; i < states.size(); ++i)  
+            if (states[i] != o.states[i]) return false;  
+        return true;  
+    }  
+};  
 
-// PaletteKey 哈希
-struct PaletteKeyHash {
-    size_t operator()(const PaletteKey& k) const noexcept {
-        size_t h = k.typeId;
-        for (auto& s : k.states) {
-            h ^= (s.first + 0x9e3779b9 + (h << 6) + (h >> 2));
-            h ^= (s.second + 0x9e3779b9 + (h << 6) + (h >> 2));
-        }
-        return h;
-    }
+// 更新 PaletteKeyHash，包含 NBT 数据的哈希  
+struct PaletteKeyHash {  
+    size_t operator()(const PaletteKey& k) const noexcept {  
+        size_t h = k.typeId;  
+        for (auto& s : k.states) {  
+            h ^= (s.first + 0x9e3779b9 + (h << 6) + (h >> 2));  
+            h ^= (s.second + 0x9e3779b9 + (h << 6) + (h >> 2));  
+        }  
+          
+        // 添加 NBT 数据到哈希  
+        if (k.nbtData) {  
+            // 使用NBT数据的字符串表示进行哈希  
+            std::ostringstream oss;  
+            nbt::io::write_compound(oss, *k.nbtData);  
+            std::hash<std::string> stringHash;  
+            h ^= (stringHash(oss.str()) + 0x9e3779b9 + (h << 6) + (h >> 2));  
+        }  
+          
+        return h;  
+    }  
 };
 
 struct BlockInfo {
