@@ -77,62 +77,63 @@ public:
         height(worldHeight), minY(worldMinY) {
         std::filesystem::create_directories(tempDir);
     }
-void addBlock(int x, int y, int z,     
-              const std::string& blockType,    
-              const std::vector<std::pair<std::string, std::string>>& states = {}) {    
-      
-    // 动态更新边界  
-    if (!hasBounds) {  
-        minX = maxX = x;  
-        minZ = maxZ = z;  
-        hasBounds = true;  
-    } else {  
-        minX = std::min(minX, x);  
-        maxX = std::max(maxX, x);  
-        minZ = std::min(minZ, z);  
-        maxZ = std::max(maxZ, z);  
-    }  
+void addBlock(int x, int y, int z,       
+    const std::string& blockType,  
+    const std::vector<std::pair<std::string, std::string>>& states = {},  
+    nbt::tag_compound_ptr nbtData = nullptr) {  // 使用libnbt++类型  
   
-    // 计算相对于边界的坐标  
-    int relativeX = x - minX;  
-    int relativeZ = z - minZ;  
+    // 动态更新边界    
+    if (!hasBounds) {    
+        minX = maxX = x;    
+        minZ = maxZ = z;    
+        hasBounds = true;    
+    } else {    
+        minX = std::min(minX, x);    
+        maxX = std::max(maxX, x);    
+        minZ = std::min(minZ, z);    
+        maxZ = std::max(maxZ, z);    
+    }    
   
-    // 计算当前的世界尺寸 (向上取整到 144 的倍数)  
-    int currentWidth = maxX - minX + 1;  
-    int currentLength = maxZ - minZ + 1;  
-    int subChunkCountX = (currentWidth + 143) / 144;  
+    // 计算相对于边界的坐标    
+    int relativeX = x - minX;    
+    int relativeZ = z - minZ;    
   
-    // 使用相对坐标计算 sub-chunk 索引  
-    int subChunkIndexX = relativeX / 144;  
-    int subChunkIndexZ = relativeZ / 144;  
-    int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;  
+    // 计算当前的世界尺寸 (向上取整到 144 的倍数)    
+    int currentWidth = maxX - minX + 1;    
+    int currentLength = maxZ - minZ + 1;    
+    int subChunkCountX = (currentWidth + 143) / 144;    
   
-    // 计算局部坐标 (相对于 sub-chunk)  
-    int localX = relativeX % 144;  
-    int localZ = relativeZ % 144;  
-    int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]  
-        
-    // 获取或创建 IDs (使用优化的 O(1) 查找)    
-    BlockTypeID typeId = getOrCreateTypeId(blockType);    
-        
-    PaletteKey key;    
-    key.typeId = typeId;    
-    for (const auto& [stateName, stateValue] : states) {  
-        BlockStateID stateId = getOrCreateStateId(stateName);  
-        StateValueID valueId = getOrCreateStateValue(stateValue);  
-        key.states.push_back({ stateId, valueId });  
-    }  
-        
-    PaletteID paletteId = getOrCreatePaletteId(key);    
-        
-    // 添加到对应的 sub-chunk    
-    auto& subChunk = activeSubChunks[subChunkIndex];    
-    addBlockToGroup(subChunk, paletteId, localX, localY, localZ);  
-        
-    // 优化: 批量 flush 策略    
-    checkAndFlush();    
+    // 使用相对坐标计算 sub-chunk 索引    
+    int subChunkIndexX = relativeX / 144;    
+    int subChunkIndexZ = relativeZ / 144;    
+    int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;    
+  
+    // 计算局部坐标 (相对于 sub-chunk)    
+    int localX = relativeX % 144;    
+    int localZ = relativeZ % 144;    
+    int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]    
+  
+    // 获取或创建 IDs (使用优化的 O(1) 查找)      
+    BlockTypeID typeId = getOrCreateTypeId(blockType);      
+  
+    // 构建PaletteKey  
+    PaletteKey key;      
+    key.typeId = typeId;      
+    for (const auto& [stateName, stateValue] : states) {    
+        BlockStateID stateId = getOrCreateStateId(stateName);    
+        StateValueID valueId = getOrCreateStateValue(stateValue);    
+        key.states.push_back({ stateId, valueId });    
+    }    
+    key.nbtData = nbtData;  // 直接存储tag_compound_ptr  
+    PaletteID paletteId = getOrCreatePaletteId(key);      
+  
+    // 添加到对应的 sub-chunk      
+    auto& subChunk = activeSubChunks[subChunkIndex];      
+    addBlockToGroup(subChunk, paletteId, localX, localY, localZ);      
+  
+    // 优化: 批量 flush 策略      
+    checkAndFlush();      
 }
-      
     // 完成写入  
     void finalize() {  
         // Flush 所有剩余的 sub-chunk  
