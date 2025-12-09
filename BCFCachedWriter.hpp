@@ -150,49 +150,55 @@ void addBlock(int x, int y, int z,
     }  
       
 
-    void addBlocks(std::vector<BlockData>& blocks) {
-        for (auto& block : blocks) {
-            // 内联 addBlock 逻辑以避免函数调用开销  
-            if (!hasBounds) {
-                minX = maxX = block.x;
-                minZ = maxZ = block.z;
-                hasBounds = true;
-            }
-            else {
-                minX = std::min(minX, block.x);
-                maxX = std::max(maxX, block.x);
-                minZ = std::min(minZ, block.z);
-                maxZ = std::max(maxZ, block.z);
-            }
-
-            int relativeX = block.x - minX;
-            int relativeZ = block.z - minZ;
-            int currentWidth = maxX - minX + 1;
-            int subChunkCountX = (currentWidth + 143) / 144;
-            int subChunkIndexX = relativeX / 144;
-            int subChunkIndexZ = relativeZ / 144;
-            int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;
-            int localX = relativeX % 144;
-            int localZ = relativeZ % 144;
-            int localY = block.z + 56;
-
-            BlockTypeID typeId = getOrCreateTypeId(block.blockType);
-            PaletteKey key;
-            key.typeId = typeId;
-            for (const auto& [stateName, stateValue] : block.states) {
-                BlockStateID stateId = getOrCreateStateId(stateName);
-                StateValueID valueId = getOrCreateStateValue(stateValue);
-                key.states.push_back({ stateId, valueId });
-            }
-            PaletteID paletteId = getOrCreatePaletteId(key);
-
-            auto& subChunk = activeSubChunks[subChunkIndex];
-            addBlockToGroup(subChunk, paletteId, localX, localY, localZ);
-        }
-
-        // 批量检查一次  
-        checkAndFlush();
-    }
+void addBlocks(std::vector<BlockData>& blocks) {  
+    // 更新BlockData结构体包含NBT数据  
+    struct BlockData {  
+        int x, y, z;  
+        std::string blockType;  
+        std::vector<std::pair<std::string, std::string>> states;  
+        nbt::tag_compound_ptr nbtData;  // 新增NBT字段  
+    };  
+      
+    for (auto& block : blocks) {  
+4            // 内联 addBlock 逻辑以避免函数调用开销  
+155            if (!hasBounds) {
+156                minX = maxX = block.x;
+157                minZ = maxZ = block.z;
+158                hasBounds = true;
+159            }
+160            else {
+161                minX = std::min(minX, block.x);
+162                maxX = std::max(maxX, block.x);
+163                minZ = std::min(minZ, block.z);
+164                maxZ = std::max(maxZ, block.z);
+165            }
+166
+167            int relativeX = block.x - minX;
+168            int relativeZ = block.z - minZ;
+169            int currentWidth = maxX - minX + 1;
+170            int subChunkCountX = (currentWidth + 143) / 144;
+171            int subChunkIndexX = relativeX / 144;
+172            int subChunkIndexZ = relativeZ / 144;
+173            int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;
+174            int localX = relativeX % 144;
+175            int localZ = relativeZ % 144;
+176            int localY = block.z + 56;
+        BlockTypeID typeId = getOrCreateTypeId(block.blockType);  
+        PaletteKey key;  
+        key.typeId = typeId;  
+        for (const auto& [stateName, stateValue] : block.states) {  
+            BlockStateID stateId = getOrCreateStateId(stateName);  
+            StateValueID valueId = getOrCreateStateValue(stateValue);  
+            key.states.push_back({ stateId, valueId });  
+        }  
+        key.nbtData = block.nbtData;  // 新增：设置NBT数据  
+        PaletteID paletteId = getOrCreatePaletteId(key);  
+          
+        auto& subChunk = activeSubChunks[subChunkIndex];  
+        addBlockToGroup(subChunk, paletteId, localX, localY, localZ);  
+    }  
+    checkAndFlush();  
+}
 
     ~BCFCachedWriter() {  
         if (!activeSubChunks.empty() || !subChunkCacheFiles.empty()) {  
