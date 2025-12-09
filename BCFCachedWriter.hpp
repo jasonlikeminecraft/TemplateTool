@@ -341,14 +341,14 @@ void mergeAllCacheFiles() {
     int finalLength = hasBounds ? (maxZ - minZ + 1) : 144;  
     int subChunkCountX = (finalWidth + 143) / 144;  
   
-    // 写入占位符 header    
+    // 写入占位符 header      
     BCFHeader header;  
     header.width = static_cast<uint16_t>(finalWidth);  
     header.length = static_cast<uint16_t>(finalLength);  
     header.height = height;  
     write_le<BCFHeader>(ofs, header);  
   
-    // 按顺序处理所有 sub-chunk    
+    // 按顺序处理所有 sub-chunk      
     std::vector<FilePos> subChunkOffsets;  
   
     for (const auto& [index, cacheFile] : subChunkCacheFiles) {  
@@ -358,10 +358,10 @@ void mergeAllCacheFiles() {
         int subChunkX = index % subChunkCountX;  
         int subChunkZ = index / subChunkCountX;  
         Coord originX = static_cast<Coord>(minX + subChunkX * 144);  
-        Coord originY = static_cast<Coord>(minY);  // 修复: 使用 minY 而不是 0  
+        Coord originY = static_cast<Coord>(minY);  
         Coord originZ = static_cast<Coord>(minZ + subChunkZ * 144);  
-          
-        // 读取所有片段    
+  
+        // 读取所有片段并合并  
         std::ifstream ifs(cacheFile, std::ios::binary);  
         if (!ifs) {  
             throw std::runtime_error("Failed to read cache file: " + cacheFile);  
@@ -369,7 +369,7 @@ void mergeAllCacheFiles() {
   
         std::vector<BlockGroup> allGroups;  
   
-        // 读取所有片段并收集    
+        // 读取所有片段并收集      
         while (ifs.peek() != EOF) {  
             uint32_t groupCount = read_u32(ifs);  
             for (uint32_t i = 0; i < groupCount; i++) {  
@@ -378,24 +378,24 @@ void mergeAllCacheFiles() {
         }  
         ifs.close();  
   
-        // 先合并相同 paletteId 的 BlockGroup    
+        // 先合并相同 paletteId 的 BlockGroup      
         allGroups = MergeUtils::mergeBlockGroups(allGroups);  
   
-        // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion    
+        // 使用 RegionMergeUtils 将 BlockGroup 转换为 BlockRegion      
         auto mergedRegions = RegionMergeUtils::mergeToRegions(allGroups);  
   
-        // 传递三个坐标参数    
+        // 传递三个坐标参数      
         SubChunkUtils::writeSubChunk(ofs, mergedRegions, originX, originY, originZ);  
     }  
   
-    // 写入偏移量表    
+    // 写入子区块偏移量表  
     FilePos offsetTablePos = ofs.tellp();  
     write_u64(ofs, subChunkOffsets.size());  
     for (auto offset : subChunkOffsets) {  
         write_u64(ofs, offset);  
     }  
   
-    // 写入 palette    
+    // 写入 palette 时序列化 NBT 数据  
     FilePos palettePos = ofs.tellp();  
     write_u32(ofs, static_cast<uint32_t>(paletteList.size()));  
     for (size_t pid = 0; pid < paletteList.size(); pid++) {  
@@ -407,9 +407,19 @@ void mergeAllCacheFiles() {
             write_u8(ofs, s.first);  
             write_u8(ofs, s.second);  
         }  
+          
+        // 序列化 NBT 数据  
+        if (k.nbtData) {  
+            std::ostringstream oss;  
+            nbt::io::write_compound(oss, *k.nbtData);  
+            std::string nbtStr = oss.str();  
+            writeString16(ofs, nbtStr);  
+        } else {  
+            writeString16(ofs, "");  // 空NBT数据  
+        }  
     }  
   
-    // 写入 type map    
+    // 写入类型名映射  
     FilePos typeMapPos = ofs.tellp();  
     write_u32(ofs, static_cast<uint32_t>(typeMap.size()));  
     for (const auto& kv : typeMap) {  
@@ -417,7 +427,7 @@ void mergeAllCacheFiles() {
         writeString16(ofs, kv.second);  
     }  
   
-    // 写入 state map    
+    // 写入状态映射  
     FilePos stateMapPos = ofs.tellp();  
     write_u32(ofs, static_cast<uint32_t>(stateMap.size()));  
     for (const auto& kv : stateMap) {  
@@ -425,7 +435,7 @@ void mergeAllCacheFiles() {
         writeString16(ofs, kv.second);  
     }  
   
-    // 写入 state value map    
+    // 写入 state value map      
     FilePos stateValueMapPos = ofs.tellp();  
     write_u32(ofs, static_cast<uint32_t>(stateValueMap.size()));  
     for (const auto& kv : stateValueMap) {  
@@ -433,16 +443,15 @@ void mergeAllCacheFiles() {
         writeString16(ofs, kv.second);  
     }  
   
-    // 更新 header 时添加新的偏移量字段    
-    header.stateValueMapOffset = stateValueMapPos;  
-  
-    // 更新 header (版本升级到 3)    
-    header.version = 3;  
+    // 更新 header (版本升级到 4)      
+    header.version = 4;  
     header.subChunkCount = subChunkOffsets.size();  
     header.subChunkOffsetsTableOffset = offsetTablePos;  
     header.paletteOffset = palettePos;  
     header.blockTypeMapOffset = typeMapPos;  
     header.stateNameMapOffset = stateMapPos;  
+    header.stateValueMapOffset = stateValueMapPos;  
+    header.nbtDataOffset = 0;  // NBT 数据嵌入在 palette 中  
   
     ofs.seekp(0);  
     write_le<BCFHeader>(ofs, header);  
