@@ -53,6 +53,7 @@ bool hasBounds = false;  // 标记是否已有方块数据
 
     // 跟踪缓存文件  
     std::map<int, std::string> subChunkCacheFiles;  
+std::unordered_map<int, std::ofstream> tempFileHandles;
       
     // 当前活跃的 sub-chunk  
     std::map<int, std::vector<BlockGroup>> activeSubChunks;  
@@ -62,6 +63,10 @@ bool hasBounds = false;  // 标记是否已有方块数据
     std::unordered_map<PaletteKey, PaletteID, PaletteKeyHash> paletteCache;  
     BlockTypeID nextTypeId = 0;  
     BlockStateID nextStateId = 0;  
+
+private:  
+    size_t blockCounter = 0;  
+    static constexpr size_t FLUSH_CHECK_INTERVAL = 100;
   
 public:  
     BCFCachedWriter(const std::string& filename,
@@ -130,24 +135,36 @@ void addBlock(int x, int y, int z,
     // 添加到对应的 sub-chunk      
     auto& subChunk = activeSubChunks[subChunkIndex];      
     addBlockToGroup(subChunk, paletteId, localX, localY, localZ);      
-  
-    // 优化: 批量 flush 策略      
-    checkAndFlush();      
-}
-    // 完成写入  
-    void finalize() {  
-        // Flush 所有剩余的 sub-chunk  
-        for (auto& [index, groups] : activeSubChunks) {  
-            flushSubChunkToCache(index, groups);  
-        }  
-        activeSubChunks.clear();  
-          
-        // 合并所有缓存文件  
-        mergeAllCacheFiles();  
-          
-        // 清理临时文件  
-        cleanup();  
+      // 优化：批量检查flush  
+    if (++blockCounter >= FLUSH_CHECK_INTERVAL) {  
+        checkAndFlush();  
+        blockCounter = 0;  
     }  
+}  
+}
+    // 完成写入 
+void finalize() {  
+    // 1. 关闭所有临时文件句柄（优化4：文件句柄缓存）  
+    for (auto& [index, ofs] : tempFileHandles) {  
+        ofs.close();  
+    }  
+    tempFileHandles.clear();  
+      
+    // 2. Flush 所有剩余的 sub-chunk  
+    for (auto& [index, groups] : activeSubChunks) {  
+        flushSubChunkToCache(index, groups);  
+    }  
+    activeSubChunks.clear();  
+      
+    // 3. 重置计数器（优化2：减少flush检查频率）  
+    blockCounter = 0;  
+      
+    // 4. 合并所有缓存文件并写入最终BCF  
+    mergeAllCacheFiles();  
+      
+    // 5. 清理临时文件  
+    cleanup();  
+}
       
 
 void addBlocks(std::vector<BlockData>& blocks) {  
@@ -160,14 +177,14 @@ void addBlocks(std::vector<BlockData>& blocks) {
     };  
       
     for (auto& block : blocks) {  
-4            // 内联 addBlock 逻辑以避免函数调用开销  
-155            if (!hasBounds) {
-156                minX = maxX = block.x;
-157                minZ = maxZ = block.z;
-158                hasBounds = true;
-159            }
-160            else {
-161                minX = std::min(minX, block.x);
+         // 内联 addBlock 逻辑以避免函数调用开销  
+          if (!hasBounds) {
+             minX = maxX = block.x;
+              minZ = maxZ = block.z;
+              hasBounds = true;
+          }
+         else {
+           minX = std::min(minX, block.x);
 162                maxX = std::max(maxX, block.x);
 163                minZ = std::min(minZ, block.z);
 164                maxZ = std::max(maxZ, block.z);
@@ -254,21 +271,31 @@ private:
         paletteCache[key] = newId;  
         return newId;  
     }  
-      
-    void addBlockToGroup(std::vector<BlockGroup>& subChunk,   
-                        PaletteID paletteId, int x, int y, int z) {  
-        for (auto& group : subChunk) {  
-            if (group.paletteId == paletteId) {  
-                BlockUtils::addBlock(group, x, y, z);  
-                return;  
+      void addBlockToGroup(std::vector<BlockGroup>& subChunk,   
+                    PaletteID paletteId, int x, int y, int z) {  
+    for (auto& group : subChunk) {  
+        if (group.paletteId == paletteId) {  
+            // 优化：预分配空间减少重新分配  
+            if (group.x.capacity() < group.count + 1) {  
+                size_t newCapacity = std::max(group.count + 1, group.count * 2);  
+                group.x.reserve(newCapacity);  
+                group.y.reserve(newCapacity);  
+                group.z.reserve(newCapacity);  
             }  
+            BlockUtils::addBlock(group, x, y, z);  
+            return;  
         }  
-          
-        BlockGroup newGroup;  
-        newGroup.paletteId = paletteId;  
-        BlockUtils::addBlock(newGroup, x, y, z);  
-        subChunk.push_back(newGroup);  
     }  
+      
+    BlockGroup newGroup;  
+    newGroup.paletteId = paletteId;  
+    // 优化：新组预分配1000个元素空间  
+    newGroup.x.reserve(1000);  
+    newGroup.y.reserve(1000);  
+    newGroup.z.reserve(1000);  
+    BlockUtils::addBlock(newGroup, x, y, z);  
+    subChunk.push_back(newGroup);  
+}
       
     size_t getTotalBlocksInMemory() {  
         size_t total = 0;  
@@ -313,29 +340,33 @@ private:
         }  
     }  
       
-    // 优化: 追加模式,避免重复读写  
-    void flushSubChunkToCache(int subChunkIndex, std::vector<BlockGroup>& groups) {  
+
+void flushSubChunkToCache(int subChunkIndex, std::vector<BlockGroup>& groups) {  
+    // 优化：复用文件句柄  
+    auto it = tempFileHandles.find(subChunkIndex);  
+    if (it == tempFileHandles.end()) {  
         std::string cacheFile = tempDir + "/subchunk_" +   
                                std::to_string(subChunkIndex) + ".tmp";  
+        std::vector<char> buffer(64 * 1024);  
           
-        // 直接追加,不读取现有数据  
-        std::ofstream ofs(cacheFile, std::ios::binary | std::ios::app);  
+        auto& ofs = tempFileHandles[subChunkIndex];  
+        ofs.open(cacheFile, std::ios::binary | std::ios::app);  
+        ofs.rdbuf()->pubsetbuf(buffer.data(), buffer.size());  
         if (!ofs) {  
             throw std::runtime_error("Failed to create cache file: " + cacheFile);  
         }  
-          
-        // 写入片段标记  
-        write_u32(ofs, static_cast<uint32_t>(groups.size()));  
-          
-        // 写入所有 BlockGroup  
-        for (const auto& bg : groups) {  
-            BlockUtils::writeBlockGroup(ofs, bg);  
-        }  
-          
-        ofs.close();  
-        subChunkCacheFiles[subChunkIndex] = cacheFile;  
     }  
       
+    auto& ofs = tempFileHandles[subChunkIndex];  
+    // 写入数据（不再关闭文件）  
+    write_u32(ofs, static_cast<uint32_t>(groups.size()));  
+    for (const auto& bg : groups) {  
+        BlockUtils::writeBlockGroup(ofs, bg);  
+    }  
+      
+    subChunkCacheFiles[subChunkIndex] = tempDir + "/subchunk_" +   
+                                       std::to_string(subChunkIndex) + ".tmp";  
+}  
 void mergeAllCacheFiles() {  
     std::ofstream ofs(outputFilename, std::ios::binary);  
     if (!ofs) {  
