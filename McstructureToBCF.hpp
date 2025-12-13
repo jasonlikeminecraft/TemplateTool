@@ -99,7 +99,7 @@ public:
                                 valueStr = std::to_string(static_cast<int32_t>(stateValue));
                                 break;
                             case nbt::tag_type::String:
-                                valueStr = "\"" + static_cast<std::string>(stateValue) + "\"";
+                                valueStr = static_cast<std::string>(stateValue);
                                 break;
                             default:
                                 valueStr = static_cast<std::string>(stateValue);
