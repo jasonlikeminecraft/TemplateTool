@@ -43,7 +43,7 @@ inline std::string readString16(std::ifstream& ifs) {
 }
 
 // 写入32位长度前缀的字符串  
-void writeString32(std::ofstream& ofs, const std::string& str) {
+inline void writeString32(std::ofstream& ofs, const std::string& str) {
     size_t s_len = str.size();
 
     write_u32(ofs, s_len);
@@ -51,7 +51,7 @@ void writeString32(std::ofstream& ofs, const std::string& str) {
 }
 
 // 读取32位长度前缀的字符串  
-std::string readString32(std::ifstream& ifs) {
+inline std::string readString32(std::ifstream& ifs) {
     uint16_t len = read_u32(ifs);
     std::string s; if (len) { s.resize(len); ifs.read(&s[0], len); }
     return s;

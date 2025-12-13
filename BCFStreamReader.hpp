@@ -60,7 +60,7 @@ public:    BCFStreamReader(const std::string& filename) : filename(filename) {
           
         // 读取并反序列化 NBT 数据（版本 4+）  
         if (header.version >= 4) {
-            std::string nbtStr = readString16(ifs);
+            std::string nbtStr = readString32(ifs);
             if (!nbtStr.empty()) {
                 std::istringstream iss(nbtStr);
                 try {

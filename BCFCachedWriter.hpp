@@ -466,9 +466,9 @@ void mergeAllCacheFiles() {
             nbt::io::stream_writer writer(oss,endian::little);
             writer.write_tag("" ,* k.nbtData);
             std::string nbtStr = oss.str();  
-            writeString16(ofs, nbtStr);  
+            writeString32(ofs, nbtStr);
         } else {  
-            writeString16(ofs, "");  // 空NBT数据  
+            writeString32(ofs, "");  // 空NBT数据  
         }  
     }  
   
