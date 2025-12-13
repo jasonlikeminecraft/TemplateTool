@@ -99,8 +99,8 @@ struct PaletteKeyHash {
         if (k.nbtData) {  
             // 使用NBT数据的字符串表示进行哈希  
             std::ostringstream oss;  
-            nbt::io::stream_writer writer(oss);
-            writer.write_payload(*k.nbtData);
+            nbt::io::stream_writer writer(oss,endian::little);
+            writer.write_tag("", *k.nbtData);
             std::hash<std::string> stringHash;  
             h ^= (stringHash(oss.str()) + 0x9e3779b9 + (h << 6) + (h >> 2));  
         }  
