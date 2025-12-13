@@ -463,7 +463,7 @@ void mergeAllCacheFiles() {
         // 序列化 NBT 数据  
         if (k.nbtData) {  
             std::ostringstream oss;  
-            nbt::io::stream_writer writer(oss);
+            nbt::io::stream_writer writer(oss,endian::little);
             writer.write_tag("" ,* k.nbtData);
             std::string nbtStr = oss.str();  
             writeString16(ofs, nbtStr);  

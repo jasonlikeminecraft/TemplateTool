@@ -64,7 +64,7 @@ public:    BCFStreamReader(const std::string& filename) : filename(filename) {
             if (!nbtStr.empty()) {
                 std::istringstream iss(nbtStr);
                 try {
-                    nbt::io::stream_reader reader(iss);
+                    nbt::io::stream_reader reader(iss,endian::little);
 
                     // 读取完整 root tag
                     auto root = reader.read_tag();
