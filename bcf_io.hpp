@@ -19,9 +19,19 @@ inline uint32_t read_u32(std::ifstream& ifs) { uint32_t v; read_le(ifs, v); retu
 inline uint64_t read_u64(std::ifstream& ifs) { uint64_t v; read_le(ifs, v); return v; }
 inline int16_t  read_i16(std::ifstream& ifs) { int16_t v; read_le(ifs, v); return v; }
 
-// -------------------- �ַ���д�� --------------------
+// -------------------- ×Ö·û´®Ð´¶Á --------------------
 inline void writeString16(std::ofstream& ofs, const std::string& s) {
-    uint16_t len = static_cast<uint16_t>(std::min<size_t>(s.size(), 65535));
+    size_t s_len = s.size();
+
+    // 检查长度是否超出 uint16_t 的最大值 65535
+    if (s_len > 65535) {
+        // 抛出运行时错误，而不是静默截断数据
+        throw std::runtime_error("String length exceeds the maximum allowed 65535 for BCF writeString16.");
+    }
+    
+    // 长度在范围内，安全地转换为 uint16_t
+    uint16_t len = static_cast<uint16_t>(s_len); 
+
     write_u16(ofs, len);
     if (len) ofs.write(s.data(), len);
 }
