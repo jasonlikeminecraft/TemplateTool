@@ -21,7 +21,8 @@ private:
     // 优化 1: 缓存文件流,避免重复打开  
     mutable std::ifstream cachedStream;  
     
-public:    BCFStreamReader(const std::string& filename) : filename(filename) {  
+public:  
+    BCFStreamReader(const std::string& filename) : filename(filename) {  
     std::ifstream ifs(filename, std::ios::binary);  
     if (!ifs) throw std::runtime_error("Failed to open file");  
   
