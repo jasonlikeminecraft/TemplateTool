@@ -1,29 +1,38 @@
-﻿#include <iostream>  
-#include "BCFCachedWriter.hpp"  
-#include "BCFStreamReader.hpp"  
+﻿#include <iostream>
+#include <chrono>  // 添加计时功能的头文件
+#include "BCFCachedWriter.hpp"
+#include "BCFStreamReader.hpp"
 #include "McstructureToBCF.hpp"
 #include "SchematicToBCF.hpp"
 #include "LitematicToBCF.hpp"
 #include "SchemToBCF.hpp"
 #include "McfunctionToBCF.hpp"
+#include "BCFBlockMerger.hpp"
 #include <nbt_tags.h>
 #include <io/stream_reader.h>
 #include <io/izlibstream.h>
 #include <io/ozlibstream.h>
-#include <fstream>  
+#include <fstream>
 
 int main() {
     try {
         while (true) {
             std::cout << "请输入转换类型:" << std::endl;
-            std::cout << "1.Mcstructure\n2.Schematic\n3.Litematic\n4.Schem\n5.Mcfunction\n";
+            std::cout << "0.合并优化\n1.Mcstructure\n2.Schematic\n3.Litematic\n4.Schem\n5.Mcfunction\n";
             int type;
             std::cin >> type;
             std::cout << "请输入输入文件路径:" << std::endl;
             std::string inputFileName;
             std::cin >> inputFileName;
 
+            auto start = std::chrono::high_resolution_clock::now();  // 记录开始时间
+
             switch (type) {
+            case 0:
+            {
+                BCFBlockMerger merger(inputFileName);
+                break;
+            }
             case 1:
             {
                 McstructureToBCF mcstructureToBCF(inputFileName, "output.bcf");
@@ -52,10 +61,14 @@ int main() {
             default:
             {
                 std::cout << "无效的输入类型" << std::endl;
-                break;
+                continue;  // 无效类型时继续循环，避免计算转换时间
             }
             }
 
+            auto end = std::chrono::high_resolution_clock::now();  // 记录结束时间
+            std::chrono::duration<double> elapsed = end - start;  // 计算转换所用时间
+
+            std::cout << "转换时间: " << elapsed.count() << " 秒" << std::endl;
 
             BCFStreamReader reader("output.bcf");
 

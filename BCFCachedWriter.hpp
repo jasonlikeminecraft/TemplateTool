@@ -11,8 +11,8 @@
 #include <filesystem>  
 #include <unordered_map>  
 #include <algorithm>  
-  
-
+#include <io/stream_writer.h>
+#include <iostream>
 struct BlockData {
     int x, y, z;
     std::string blockType;
@@ -57,7 +57,7 @@ std::unordered_map<int, std::ofstream> tempFileHandles;
       
     // 当前活跃的 sub-chunk  
     std::map<int, std::vector<BlockGroup>> activeSubChunks;  
-    size_t maxBlocksInMemory = 50000;  
+    size_t maxBlocksInMemory = 25000;  
       
     // ID 管理  
     std::unordered_map<PaletteKey, PaletteID, PaletteKeyHash> paletteCache;  
@@ -66,7 +66,7 @@ std::unordered_map<int, std::ofstream> tempFileHandles;
 
 private:  
     size_t blockCounter = 0;  
-    static constexpr size_t FLUSH_CHECK_INTERVAL = 100;
+    static constexpr size_t FLUSH_CHECK_INTERVAL = 200;
   
 public:  
     BCFCachedWriter(const std::string& filename,
@@ -85,7 +85,7 @@ public:
 void addBlock(int x, int y, int z,       
     const std::string& blockType,  
     const std::vector<std::pair<std::string, std::string>>& states = {},  
-    nbt::tag_compound_ptr nbtData = nullptr) {  // 使用libnbt++类型  
+    std::shared_ptr<nbt::tag_compound> nbtData = nullptr) {  // 使用libnbt++类型  
   
     // 动态更新边界    
     if (!hasBounds) {    
@@ -129,7 +129,7 @@ void addBlock(int x, int y, int z,
         StateValueID valueId = getOrCreateStateValue(stateValue);    
         key.states.push_back({ stateId, valueId });    
     }    
-    key.nbtData = nbtData;  // 直接存储tag_compound_ptr  
+    key.nbtData = nbtData;  // 直接存储tag_compound*  
     PaletteID paletteId = getOrCreatePaletteId(key);      
   
     // 添加到对应的 sub-chunk      
@@ -141,7 +141,6 @@ void addBlock(int x, int y, int z,
         blockCounter = 0;  
     }  
 }  
-}
     // 完成写入 
 void finalize() {  
     // 1. 关闭所有临时文件句柄（优化4：文件句柄缓存）  
@@ -152,7 +151,7 @@ void finalize() {
       
     // 2. Flush 所有剩余的 sub-chunk  
     for (auto& [index, groups] : activeSubChunks) {  
-        flushSubChunkToCache(index, groups);  
+        flushSubChunkToCache(index, std::move(groups));  
     }  
     activeSubChunks.clear();  
       
@@ -167,55 +166,55 @@ void finalize() {
 }
       
 
-void addBlocks(std::vector<BlockData>& blocks) {  
-    // 更新BlockData结构体包含NBT数据  
-    struct BlockData {  
-        int x, y, z;  
-        std::string blockType;  
-        std::vector<std::pair<std::string, std::string>> states;  
-        nbt::tag_compound_ptr nbtData;  // 新增NBT字段  
-    };  
-      
-    for (auto& block : blocks) {  
-         // 内联 addBlock 逻辑以避免函数调用开销  
-          if (!hasBounds) {
-             minX = maxX = block.x;
-              minZ = maxZ = block.z;
-              hasBounds = true;
-          }
-         else {
-           minX = std::min(minX, block.x);
-162                maxX = std::max(maxX, block.x);
-163                minZ = std::min(minZ, block.z);
-164                maxZ = std::max(maxZ, block.z);
-165            }
-166
-167            int relativeX = block.x - minX;
-168            int relativeZ = block.z - minZ;
-169            int currentWidth = maxX - minX + 1;
-170            int subChunkCountX = (currentWidth + 143) / 144;
-171            int subChunkIndexX = relativeX / 144;
-172            int subChunkIndexZ = relativeZ / 144;
-173            int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;
-174            int localX = relativeX % 144;
-175            int localZ = relativeZ % 144;
-176            int localY = block.z + 56;
-        BlockTypeID typeId = getOrCreateTypeId(block.blockType);  
-        PaletteKey key;  
-        key.typeId = typeId;  
-        for (const auto& [stateName, stateValue] : block.states) {  
-            BlockStateID stateId = getOrCreateStateId(stateName);  
-            StateValueID valueId = getOrCreateStateValue(stateValue);  
-            key.states.push_back({ stateId, valueId });  
-        }  
-        key.nbtData = block.nbtData;  // 新增：设置NBT数据  
-        PaletteID paletteId = getOrCreatePaletteId(key);  
-          
-        auto& subChunk = activeSubChunks[subChunkIndex];  
-        addBlockToGroup(subChunk, paletteId, localX, localY, localZ);  
-    }  
-    checkAndFlush();  
-}
+//void addBlocks(std::vector<BlockData>& blocks) {  
+//    // 更新BlockData结构体包含NBT数据  
+//    struct BlockData {  
+//        int x, y, z;  
+//        std::string blockType;  
+//        std::vector<std::pair<std::string, std::string>> states;  
+//        nbt::tag_compound* nbtData;  // 新增NBT字段  
+//    };  
+//      
+//    for (auto& block : blocks) {  
+//         // 内联 addBlock 逻辑以避免函数调用开销  
+//          if (!hasBounds) {
+//             minX = maxX = block.x;
+//              minZ = maxZ = block.z;
+//              hasBounds = true;
+//          }
+//         else {
+//           minX = std::min(minX, block.x);
+//               maxX = std::max(maxX, block.x);
+//               minZ = std::min(minZ, block.z);
+//                maxZ = std::max(maxZ, block.z);
+//           }
+//
+//           int relativeX = block.x - minX;
+//           int relativeZ = block.z - minZ;
+//           int currentWidth = maxX - minX + 1;
+//          int subChunkCountX = (currentWidth + 143) / 144;
+//          int subChunkIndexX = relativeX / 144;
+//        int subChunkIndexZ = relativeZ / 144;
+//           int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;
+//          int localX = relativeX % 144;
+//        int localZ = relativeZ % 144;
+//          int localY = block.z + 56;
+//        BlockTypeID typeId = getOrCreateTypeId(block.blockType);  
+//        PaletteKey key;  
+//        key.typeId = typeId;  
+//        for (const auto& [stateName, stateValue] : block.states) {  
+//            BlockStateID stateId = getOrCreateStateId(stateName);  
+//            StateValueID valueId = getOrCreateStateValue(stateValue);  
+//            key.states.push_back({ stateId, valueId });  
+//        }  
+//        key.nbtData = block.nbtData;  // 新增：设置NBT数据  
+//        PaletteID paletteId = getOrCreatePaletteId(key);  
+//          
+//        auto& subChunk = activeSubChunks[subChunkIndex];  
+//        addBlockToGroup(subChunk, paletteId, localX, localY, localZ);  
+//    }  
+//    checkAndFlush();  
+//}
 
     ~BCFCachedWriter() {  
         if (!activeSubChunks.empty() || !subChunkCacheFiles.empty()) {  
@@ -271,32 +270,85 @@ private:
         paletteCache[key] = newId;  
         return newId;  
     }  
-      void addBlockToGroup(std::vector<BlockGroup>& subChunk,   
-                    PaletteID paletteId, int x, int y, int z) {  
-    for (auto& group : subChunk) {  
-        if (group.paletteId == paletteId) {  
-            // 优化：预分配空间减少重新分配  
-            if (group.x.capacity() < group.count + 1) {  
-                size_t newCapacity = std::max(group.count + 1, group.count * 2);  
-                group.x.reserve(newCapacity);  
-                group.y.reserve(newCapacity);  
-                group.z.reserve(newCapacity);  
-            }  
-            BlockUtils::addBlock(group, x, y, z);  
-            return;  
-        }  
-    }  
-      
-    BlockGroup newGroup;  
-    newGroup.paletteId = paletteId;  
-    // 优化：新组预分配1000个元素空间  
-    newGroup.x.reserve(1000);  
-    newGroup.y.reserve(1000);  
-    newGroup.z.reserve(1000);  
-    BlockUtils::addBlock(newGroup, x, y, z);  
-    subChunk.push_back(newGroup);  
-}
-      
+    void addBlockToGroup(std::vector<BlockGroup>& subChunk,
+        PaletteID paletteId, int x, int y, int z)
+    {
+        // 1️⃣ 查找已有 BlockGroup
+        for (auto& group : subChunk) {
+            if (group.paletteId == paletteId) {
+                // 2️⃣ 确保 vector 有足够容量
+                size_t sz = group.x.size();
+                if (group.x.capacity() < sz + 1) {
+                    size_t newCap = std::max(sz + 1, sz * 2);
+                    group.x.reserve(newCap);
+                    group.y.reserve(newCap);
+                    group.z.reserve(newCap);
+                }
+                // 3️⃣ 添加方块
+                BlockUtils::addBlock(group, x, y, z);
+                return;
+            }
+        }
+
+        // 4️⃣ 没有找到对应 paletteId，新建 BlockGroup
+        BlockGroup newGroup;
+        newGroup.paletteId = paletteId;
+
+        constexpr size_t initialReserve = 1000;
+        newGroup.x.reserve(initialReserve);
+        newGroup.y.reserve(initialReserve);
+        newGroup.z.reserve(initialReserve);
+
+        BlockUtils::addBlock(newGroup, x, y, z);
+
+        // 5️⃣ 安全 push 到 subChunk
+        try {
+            subChunk.push_back(std::move(newGroup));
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Error pushing new BlockGroup: " << e.what() << std::endl;
+        }
+    }
+
+    // ==========================
+
+    void checkAndFlush() {
+        size_t total = getTotalBlocksInMemory();
+        if (total < maxBlocksInMemory) return;
+
+        // 1️⃣ 统计各 sub-chunk 大小
+        std::vector<std::pair<int, size_t>> sizes;
+        for (const auto& [idx, groups] : activeSubChunks) {
+            size_t count = 0;
+            for (const auto& g : groups) count += g.count;
+            sizes.push_back({ idx, count });
+        }
+
+        // 2️⃣ 按大小降序排序
+        std::sort(sizes.begin(), sizes.end(),
+            [](const auto& a, const auto& b) { return a.second > b.second; });
+
+        // 3️⃣ Flush 直到低于阈值
+        size_t target = static_cast<size_t>(maxBlocksInMemory * 0.8);
+        for (const auto& [idx, size] : sizes) {
+            if (total <= target) break;
+
+            auto it = activeSubChunks.find(idx);
+            if (it != activeSubChunks.end()) {
+                // move 出去
+                std::vector<BlockGroup> groups;
+                groups.swap(it->second);
+
+                // 删除原条目，确保不再访问
+                activeSubChunks.erase(it);
+
+                // flush
+                flushSubChunkToCache(idx, std::move(groups));
+            }
+            total -= size;
+        }
+    }
+
     size_t getTotalBlocksInMemory() {  
         size_t total = 0;  
         for (const auto& [idx, groups] : activeSubChunks) {  
@@ -307,66 +359,29 @@ private:
         return total;  
     }  
       
-    // 优化: 批量 flush 策略  
-    void checkAndFlush() {  
-        size_t total = getTotalBlocksInMemory();  
-          
-        if (total >= maxBlocksInMemory) {  
-            // 计算每个 sub-chunk 的大小  
-            std::vector<std::pair<int, size_t>> sizes;  
-            for (const auto& [idx, groups] : activeSubChunks) {  
-                size_t count = 0;  
-                for (const auto& g : groups) {  
-                    count += g.count;  
-                }  
-                sizes.push_back({idx, count});  
-            }  
-              
-            // 按大小排序,优先 flush 大的  
-            std::sort(sizes.begin(), sizes.end(),   
-                     [](const auto& a, const auto& b) {   
-                         return a.second > b.second;   
-                     });  
-              
-            // Flush 直到低于阈值的 80%  
-            size_t target = static_cast<size_t>(maxBlocksInMemory * 0.8);  
-            for (const auto& [idx, size] : sizes) {  
-                if (total <= target) break;  
-                  
-                flushSubChunkToCache(idx, activeSubChunks[idx]);  
-                activeSubChunks.erase(idx);  
-                total -= size;  
-            }  
-        }  
-    }  
-      
 
-void flushSubChunkToCache(int subChunkIndex, std::vector<BlockGroup>& groups) {  
-    // 优化：复用文件句柄  
-    auto it = tempFileHandles.find(subChunkIndex);  
-    if (it == tempFileHandles.end()) {  
-        std::string cacheFile = tempDir + "/subchunk_" +   
-                               std::to_string(subChunkIndex) + ".tmp";  
-        std::vector<char> buffer(64 * 1024);  
-          
-        auto& ofs = tempFileHandles[subChunkIndex];  
-        ofs.open(cacheFile, std::ios::binary | std::ios::app);  
-        ofs.rdbuf()->pubsetbuf(buffer.data(), buffer.size());  
-        if (!ofs) {  
-            throw std::runtime_error("Failed to create cache file: " + cacheFile);  
-        }  
-    }  
-      
-    auto& ofs = tempFileHandles[subChunkIndex];  
-    // 写入数据（不再关闭文件）  
-    write_u32(ofs, static_cast<uint32_t>(groups.size()));  
-    for (const auto& bg : groups) {  
-        BlockUtils::writeBlockGroup(ofs, bg);  
-    }  
-      
-    subChunkCacheFiles[subChunkIndex] = tempDir + "/subchunk_" +   
-                                       std::to_string(subChunkIndex) + ".tmp";  
-}  
+
+    void flushSubChunkToCache(int subChunkIndex, std::vector<BlockGroup>&& groups) {
+        try {
+            auto& ofs = tempFileHandles[subChunkIndex];
+            if (!ofs.is_open()) {
+                std::string cacheFile = tempDir + "/subchunk_" + std::to_string(subChunkIndex) + ".tmp";
+                ofs.open(cacheFile, std::ios::binary | std::ios::app);
+                if (!ofs) throw std::runtime_error("Failed to open cache file");
+            }
+
+            write_u32(ofs, static_cast<uint32_t>(groups.size()));
+            for (auto& bg : groups) {
+                BlockUtils::writeBlockGroup(ofs, bg);
+            }
+
+            subChunkCacheFiles[subChunkIndex] =
+                tempDir + "/subchunk_" + std::to_string(subChunkIndex) + ".tmp";
+        }
+        catch (const std::exception& e) {
+            std::cerr << "flushSubChunkToCache error: " << e.what() << std::endl;
+        }
+    }
 void mergeAllCacheFiles() {  
     std::ofstream ofs(outputFilename, std::ios::binary);  
     if (!ofs) {  
@@ -448,7 +463,8 @@ void mergeAllCacheFiles() {
         // 序列化 NBT 数据  
         if (k.nbtData) {  
             std::ostringstream oss;  
-            nbt::io::write_compound(oss, *k.nbtData);  
+            nbt::io::stream_writer writer(oss);
+            writer.write_tag("" ,* k.nbtData);
             std::string nbtStr = oss.str();  
             writeString16(ofs, nbtStr);  
         } else {  

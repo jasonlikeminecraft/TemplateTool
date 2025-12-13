@@ -3,7 +3,8 @@
 #include <nbt_tags.h>  
 #include <vector>
 #include <string>
-
+#include <io/stream_writer.h>
+#include <io/stream_reader.h>
 // -------------------- 类型别名 --------------------
 using FilePos = uint64_t;   // 文件偏移量或大小
 using SubChunkSize = uint64_t;   // 子区块大小
@@ -62,21 +63,23 @@ struct BlockGroup {
     std::vector<Coord> x, y, z;
 };
 
+
+
+
 // -------------------- PaletteKey --------------------
 
-// 扩展 PaletteKey，使用libnbt++的tag_compound_ptr  
+// 扩展 PaletteKey，使用libnbt++的tag_compound*  
 struct PaletteKey {  
     BlockTypeID typeId;  
     std::vector<StatePair> states;  
-    nbt::tag_compound_ptr nbtData;  // 使用libnbt++的智能指针类型  
+    std::shared_ptr<nbt::tag_compound> nbtData;// 使用libnbt++的智能指针类型  
   
     bool operator==(const PaletteKey& o) const {  
         if (typeId != o.typeId || states.size() != o.states.size()) return false;  
           
         // 比较NBT数据  
         if ((nbtData == nullptr) != (o.nbtData == nullptr)) return false;  
-        if (nbtData && o.nbtData && !nbtData->equals(*o.nbtData)) return false;  
-          
+        if (nbtData && o.nbtData && !(*nbtData == *o.nbtData)) return false;
         for (size_t i = 0; i < states.size(); ++i)  
             if (states[i] != o.states[i]) return false;  
         return true;  
@@ -96,7 +99,8 @@ struct PaletteKeyHash {
         if (k.nbtData) {  
             // 使用NBT数据的字符串表示进行哈希  
             std::ostringstream oss;  
-            nbt::io::write_compound(oss, *k.nbtData);  
+            nbt::io::stream_writer writer(oss);
+            writer.write_payload(*k.nbtData);
             std::hash<std::string> stringHash;  
             h ^= (stringHash(oss.str()) + 0x9e3779b9 + (h << 6) + (h >> 2));  
         }  

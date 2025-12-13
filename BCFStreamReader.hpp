@@ -59,22 +59,38 @@ public:    BCFStreamReader(const std::string& filename) : filename(filename) {
         }  
           
         // 读取并反序列化 NBT 数据（版本 4+）  
-        if (header.version >= 4) {  
-            std::string nbtStr = readString16(ifs);  
-            if (!nbtStr.empty()) {  
-                std::istringstream iss(nbtStr);  
-                try {  
-                    auto [name, tag] = nbt::io::read_compound(iss);  
-                    pk.nbtData = std::move(tag);  
-                } catch (const std::exception&) {  
-                    pk.nbtData = nullptr;  
-                }  
-            } else {  
-                pk.nbtData = nullptr;  
-            }  
-        } else {  
-            pk.nbtData = nullptr;  
-        }  
+        if (header.version >= 4) {
+            std::string nbtStr = readString16(ifs);
+            if (!nbtStr.empty()) {
+                std::istringstream iss(nbtStr);
+                try {
+                    nbt::io::stream_reader reader(iss);
+
+                    // 读取完整 root tag
+                    auto root = reader.read_tag();
+
+                    // root 是 pair<string, shared_ptr<tag>>
+                    // 我们期望它是 compound
+                    if (root.second &&
+                        root.second->get_type() == nbt::tag_type::Compound) {
+                        // 将 unique_ptr 转为 shared_ptr
+                        pk.nbtData = std::shared_ptr<nbt::tag_compound>(
+                            static_cast<nbt::tag_compound*>(root.second.release())
+                        );
+                    }
+                    else {
+                        // 非 compound，直接丢弃
+                        pk.nbtData = nullptr;
+                    }
+                }
+                catch (const std::exception& e) {
+                    pk.nbtData = nullptr;
+                }
+            }
+            else {
+                pk.nbtData = nullptr;
+            }
+        }
           
         paletteList.push_back(pk);  
     }  
@@ -179,6 +195,22 @@ std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) {
     Coord ox, oy, oz;  
     return SubChunkUtils::readSubChunk(cachedStream, sz, ox, oy, oz);  
 }
+std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) const {
+    std::vector<BlockRegion> result;
+    if (subChunkIndex >= subChunkOffsets.size()) return result;
+
+    if (!cachedStream.is_open()) {
+        cachedStream.open(filename, std::ios::binary);
+        if (!cachedStream) {
+            throw std::runtime_error("Failed to reopen file for streaming");
+        }
+    }
+
+    cachedStream.seekg(subChunkOffsets[subChunkIndex], std::ios::beg);
+    SubChunkSize sz;
+    Coord ox, oy, oz;
+    return SubChunkUtils::readSubChunk(cachedStream, sz, ox, oy, oz);
+}
 
     const PaletteKey& getPaletteKey(PaletteID paletteId) const {
         if (paletteId >= paletteList.size()) {
@@ -210,13 +242,13 @@ std::vector<BlockRegion> getBlockRegions(size_t subChunkIndex) {
         return it->second;
     }
 // 获取指定PaletteID的NBT数据  
-nbt::tag_compound_ptr getBlockNBTData(PaletteID paletteId) const {  
+std::shared_ptr<nbt::tag_compound> getBlockNBTData(PaletteID paletteId) const {
     if (paletteId >= paletteList.size()) return nullptr;  
     return paletteList[paletteId].nbtData;  
 }  
   
 // 获取指定方块的完整NBT数据  
-nbt::tag_compound_ptr getBlockNBTData(int x, int y, int z, size_t subChunkIndex) const {  
+std::shared_ptr<nbt::tag_compound> getBlockNBTData(int x, int y, int z, size_t subChunkIndex) const {
     auto regions = getBlockRegions(subChunkIndex);  
     for (const auto& region : regions) {  
         if (x >= region.x1 && x <= region.x2 &&  

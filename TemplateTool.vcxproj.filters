@@ -242,6 +242,9 @@
     <ClInclude Include="McfunctionToBCF.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="BCFBlockMerger.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="snbt_convert.txt" />
