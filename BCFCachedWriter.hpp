@@ -512,11 +512,18 @@ void mergeAllCacheFiles() {
 }
     void cleanup() {  
         // 删除所有临时文件  
+            // 1. 强制关闭所有文件句柄  
+        for (auto& [index, ofs] : tempFileHandles) {
+            if (ofs.is_open()) {
+                ofs.flush();      // 确保数据写入  
+                ofs.close();      // 关闭文件  
+            }
+        }
         for (const auto& [index, cacheFile] : subChunkCacheFiles) {  
             try {  
                 std::filesystem::remove(cacheFile);  
-            } catch (...) {  
-                // 忽略删除失败  
+            } catch (std::exception& e) {
+               std::cerr << "Failed to remove cache file: " << e.what() << std::endl;
             }  
         }  
           
@@ -526,8 +533,8 @@ void mergeAllCacheFiles() {
                 std::filesystem::is_empty(tempDir)) {  
                 std::filesystem::remove(tempDir);  
             }  
-        } catch (...) {  
-            // 忽略删除失败  
+        } catch (std::exception& e) {
+            std::cerr << "Failed to remove temp directory: " << e.what() << std::endl;
         }  
           
         subChunkCacheFiles.clear();  
