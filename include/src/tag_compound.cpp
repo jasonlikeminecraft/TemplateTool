@@ -28,7 +28,7 @@ namespace nbt
 
 tag_compound::tag_compound(std::initializer_list<std::pair<std::string, value_initializer>> init)
 {
-    for(const auto& pair: init)
+    for( auto& pair: init)
         tags.emplace(std::move(pair.first), std::move(pair.second));
 }
 

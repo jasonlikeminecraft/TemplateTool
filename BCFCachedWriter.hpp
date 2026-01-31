@@ -124,6 +124,7 @@ void addBlock(int x, int y, int z,
     // 构建PaletteKey  
     PaletteKey key;      
     key.typeId = typeId;      
+    key.states.reserve(states.size());
     for (const auto& [stateName, stateValue] : states) {    
         BlockStateID stateId = getOrCreateStateId(stateName);    
         StateValueID valueId = getOrCreateStateValue(stateValue);    
@@ -329,7 +330,7 @@ private:
             [](const auto& a, const auto& b) { return a.second > b.second; });
 
         // 3️⃣ Flush 直到低于阈值
-        size_t target = static_cast<size_t>(maxBlocksInMemory * 0.8);
+        size_t target = static_cast<size_t>(maxBlocksInMemory);
         for (const auto& [idx, size] : sizes) {
             if (total <= target) break;
 

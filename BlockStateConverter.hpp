@@ -50,6 +50,12 @@ public:
         return true;
     }
 
+    // 新接口：从内存流加载
+    bool loadFromStream(std::istream& in);
+
+    // 直接从内置表加载
+    bool loadBuiltinTable();
+
     // 转换 Java 方块到 Bedrock 方块  
     std::pair<std::string, std::vector<std::pair<std::string, std::string>>>
         convert(const std::string& javaBlockName,

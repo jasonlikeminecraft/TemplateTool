@@ -63,6 +63,12 @@
     <ClCompile Include="SchematicToBCF.hpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="block_state_data.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BlockStateConverter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SubChunkUtils.hpp">
@@ -243,6 +249,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="BCFBlockMerger.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="block_state_data.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

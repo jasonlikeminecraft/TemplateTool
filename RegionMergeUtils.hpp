@@ -3,48 +3,68 @@
 #include <map>  
 #include <tuple>  
 #include <vector>  
+#include <unordered_set>
+#include <unordered_map>
+
+
+
 
 struct RegionMergeUtils {
     static constexpr int64_t MAX_BLOCK_COUNT = 32767;
 
-    // 将 BlockGroup 合并成 BlockRegion    
-    static std::vector<BlockRegion> mergeToRegions(
-        const std::vector<BlockGroup>& groups) {
+    // 坐标压缩成 uint64_t
+    static inline uint64_t packPos(Coord x, Coord y, Coord z) noexcept {
+        return (uint64_t(uint16_t(x)) << 32)
+            | (uint64_t(uint16_t(y)) << 16)
+            | uint64_t(uint16_t(z));
+    }
 
+    static inline void unpackPos(uint64_t key, Coord& x, Coord& y, Coord& z) noexcept {
+        x = static_cast<Coord>((key >> 32) & 0xFFFF);
+        y = static_cast<Coord>((key >> 16) & 0xFFFF);
+        z = static_cast<Coord>(key & 0xFFFF);
+    }
+
+    // 将 BlockGroup 合并成 BlockRegion
+    static std::vector<BlockRegion> mergeToRegions(const std::vector<BlockGroup>& groups) {
         std::vector<BlockRegion> regions;
 
-        // 按 paletteId 分组构建 3D 网格    
-        std::map<PaletteID, std::map<std::tuple<Coord, Coord, Coord>, bool>> grids;
+        // 构建 grids
+        std::unordered_map<PaletteID, std::unordered_set<uint64_t>> grids;
 
         for (const auto& bg : groups) {
+            // 先用临时 vector 收集坐标
+            std::vector<uint64_t> temp;
+            temp.reserve(bg.count);
             for (size_t i = 0; i < bg.count; i++) {
-                grids[bg.paletteId][{bg.x[i], bg.y[i], bg.z[i]}] = true;
+                temp.push_back(packPos(bg.x[i], bg.y[i], bg.z[i]));
             }
+
+            // 一次性构造 unordered_set，减少 insert 扩容次数
+            grids[bg.paletteId].reserve(bg.count); // 先 reserve
+            grids[bg.paletteId].insert(temp.begin(), temp.end());
         }
 
-        // 对每个 paletteId 进行贪心合并    
+        // 贪心合并
         for (auto& [paletteId, grid] : grids) {
             while (!grid.empty()) {
                 auto it = grid.begin();
-                auto [x, y, z] = it->first;
+                uint64_t startKey = *it;
+                Coord startX, startY, startZ;
+                unpackPos(startKey, startX, startY, startZ);
 
-                // 向 X 方向扩展    
-                Coord maxX = x;
-                while (grid.count({ maxX + 1, y, z })) maxX++;
+                // X 方向扩展
+                Coord maxX = startX;
+                while (grid.find(packPos(maxX + 1, startY, startZ)) != grid.end()) {
+                    maxX++;
+                }
 
-                // 向 Z 方向扩展    
-                Coord maxZ = z;
+                // Z 方向扩展
+                Coord maxZ = startZ;
                 bool canExpandZ = true;
                 while (canExpandZ) {
-                    // 检查扩展后的方块数量  
-                    int64_t newCount = (int64_t)(maxX - x + 1) * (maxZ - z + 2);
-                    if (newCount > MAX_BLOCK_COUNT) {
-                        canExpandZ = false;
-                        break;
-                    }
-
-                    for (Coord cx = x; cx <= maxX; cx++) {
-                        if (!grid.count({ cx, y, maxZ + 1 })) {
+                    for (Coord cx = startX; cx <= maxX; cx++) {
+                        if (grid.find(packPos(cx, startY, maxZ + 1)) == grid.end()) {
                             canExpandZ = false;
                             break;
                         }
@@ -52,20 +72,13 @@ struct RegionMergeUtils {
                     if (canExpandZ) maxZ++;
                 }
 
-                // 向 Y 方向扩展    
-                Coord maxY = y;
+                // Y 方向扩展
+                Coord maxY = startY;
                 bool canExpandY = true;
                 while (canExpandY) {
-                    // 检查扩展后的方块数量  
-                    int64_t newCount = (int64_t)(maxX - x + 1) * (maxZ - z + 1) * (maxY - y + 2);
-                    if (newCount > MAX_BLOCK_COUNT) {
-                        canExpandY = false;
-                        break;
-                    }
-
-                    for (Coord cx = x; cx <= maxX; cx++) {
-                        for (Coord cz = z; cz <= maxZ; cz++) {
-                            if (!grid.count({ cx, maxY + 1, cz })) {
+                    for (Coord cx = startX; cx <= maxX; cx++) {
+                        for (Coord cz = startZ; cz <= maxZ; cz++) {
+                            if (grid.find(packPos(cx, maxY + 1, cz)) == grid.end()) {
                                 canExpandY = false;
                                 break;
                             }
@@ -75,20 +88,27 @@ struct RegionMergeUtils {
                     if (canExpandY) maxY++;
                 }
 
-                // 创建区域    
-                BlockRegion region;
-                region.paletteId = paletteId;
-                region.x1 = x; region.y1 = y; region.z1 = z;
-                region.x2 = maxX; region.y2 = maxY; region.z2 = maxZ;
-                regions.push_back(region);
+                // 创建区域
+                regions.push_back({
+                    paletteId,
+                    startX, startY, startZ,
+                    maxX, maxY, maxZ
+                    });
 
-                // 移除已访问的方块    
-                for (Coord cy = y; cy <= maxY; cy++) {
-                    for (Coord cx = x; cx <= maxX; cx++) {
-                        for (Coord cz = z; cz <= maxZ; cz++) {
-                            grid.erase({ cx, cy, cz });
+                // 批量删除
+                std::vector<uint64_t> eraseList;
+                eraseList.reserve((maxX - startX + 1) * (maxY - startY + 1) * (maxZ - startZ + 1));
+
+                for (Coord y = startY; y <= maxY; y++) {
+                    for (Coord x = startX; x <= maxX; x++) {
+                        for (Coord z = startZ; z <= maxZ; z++) {
+                            eraseList.push_back(packPos(x, y, z));
                         }
                     }
+                }
+
+                for (uint64_t key : eraseList) {
+                    grid.erase(key);
                 }
             }
         }

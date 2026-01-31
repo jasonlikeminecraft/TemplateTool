@@ -149,6 +149,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BlockStateConverter.cpp" />
+    <ClCompile Include="block_state_data.cpp" />
     <ClCompile Include="include\src\endian_str.cpp" />
     <ClCompile Include="include\src\io\izlibstream.cpp" />
     <ClCompile Include="include\src\io\ozlibstream.cpp" />
@@ -166,6 +168,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BCFBlockMerger.hpp" />
+    <ClInclude Include="block_state_data.hpp" />
     <ClInclude Include="McfunctionToBCF.hpp" />
     <ClInclude Include="BlockStateConverter.hpp" />
     <ClInclude Include="BCFCachedWriter.hpp" />
