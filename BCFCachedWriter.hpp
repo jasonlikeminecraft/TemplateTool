@@ -87,37 +87,21 @@ void addBlock(int x, int y, int z,
     const std::vector<std::pair<std::string, std::string>>& states = {},  
     std::shared_ptr<nbt::tag_compound> nbtData = nullptr) {  // 使用libnbt++类型  
   
-    // 动态更新边界    
-    if (!hasBounds) {    
-        minX = maxX = x;    
-        minZ = maxZ = z;    
-        hasBounds = true;    
-    } else {    
-        minX = std::min(minX, x);    
-        maxX = std::max(maxX, x);    
-        minZ = std::min(minZ, z);    
-        maxZ = std::max(maxZ, z);    
-    }    
-  
-    // 计算相对于边界的坐标    
-    int relativeX = x - minX;    
-    int relativeZ = z - minZ;    
-  
-    // 计算当前的世界尺寸 (向上取整到 144 的倍数)    
-    int currentWidth = maxX - minX + 1;    
-    int currentLength = maxZ - minZ + 1;    
-    int subChunkCountX = (currentWidth + 143) / 144;    
-  
-    // 使用相对坐标计算 sub-chunk 索引    
-    int subChunkIndexX = relativeX / 144;    
-    int subChunkIndexZ = relativeZ / 144;    
-    int subChunkIndex = subChunkIndexZ * subChunkCountX + subChunkIndexX;    
-  
-    // 计算局部坐标 (相对于 sub-chunk)    
-    int localX = relativeX % 144;    
-    int localZ = relativeZ % 144;    
-    int localY = y + 56;  // 将 y 从 [-56, 320] 映射到 [0, 376]    
-  
+    int subChunkIndexX = x / 144;
+    int subChunkIndexZ = z / 144;
+
+    if (x < 0 && x % 144 != 0) subChunkIndexX--;
+    if (z < 0 && z % 144 != 0) subChunkIndexZ--;
+
+    // ✅ 推荐配置:不超过 Coord 限制  
+    const int subChunkCountX = 454;  // 支持 ±32,688 的坐标范围  
+    const int offset = 227;          // subChunkCountX / 2  
+
+    int subChunkIndex = (subChunkIndexZ + offset) * subChunkCountX + (subChunkIndexX + offset);
+
+    int localX = ((x % 144) + 144) % 144;
+    int localZ = ((z % 144) + 144) % 144;
+    int localY = y + 56;
     // 获取或创建 IDs (使用优化的 O(1) 查找)      
     BlockTypeID typeId = getOrCreateTypeId(blockType);      
   
@@ -406,14 +390,15 @@ void mergeAllCacheFiles() {
   
     for (const auto& [index, cacheFile] : subChunkCacheFiles) {  
         subChunkOffsets.push_back(ofs.tellp());  
-  
-        // 计算当前 subchunk 的起始坐标 (使用动态边界)  
-        int subChunkX = index % subChunkCountX;  
-        int subChunkZ = index / subChunkCountX;  
-        Coord originX = static_cast<Coord>(minX + subChunkX * 144);  
-        Coord originY = static_cast<Coord>(minY);  
-        Coord originZ = static_cast<Coord>(minZ + subChunkZ * 144);  
-  
+        const int subChunkCountX = 454;
+        const int offset = 227;
+
+        int subChunkX = (index % subChunkCountX) - offset;
+        int subChunkZ = (index / subChunkCountX) - offset;
+
+        Coord originX = static_cast<Coord>(subChunkX * 144);
+        Coord originY = static_cast<Coord>(minY);
+        Coord originZ = static_cast<Coord>(subChunkZ * 144);
         // 读取所有片段并合并  
         std::ifstream ifs(cacheFile, std::ios::binary);  
         if (!ifs) {  
