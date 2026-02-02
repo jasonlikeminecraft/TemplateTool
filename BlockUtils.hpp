@@ -19,6 +19,9 @@ struct BlockUtils {
 
     // Ð´ BlockGroup µ½ÎÄ¼þ
     static void writeBlockGroup(std::ofstream& ofs, const BlockGroup& bg) {
+        if (bg.x.size() < bg.count || bg.y.size() < bg.count || bg.z.size() < bg.count) {
+            throw std::runtime_error("BlockGroup array size mismatch");
+        }
         write_u32(ofs, bg.paletteId);
         write_u32(ofs, bg.count);
         for (size_t i = 0; i < bg.count; i++) {

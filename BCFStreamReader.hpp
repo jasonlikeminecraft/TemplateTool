@@ -43,44 +43,39 @@ public:
     }  
   
     // 读取 Palette 映射并反序列化NBT数据  
-    ifs.seekg(header.paletteOffset, std::ios::beg);  
-    uint32_t paletteCount = read_u32(ifs);  
-    paletteList.reserve(paletteCount);  
-    for (uint32_t i = 0; i < paletteCount; i++) {  
-        uint32_t pid = read_u32(ifs);  
-        BlockTypeID typeId = read_u16(ifs);  
-        uint16_t stateCount = read_u16(ifs);  
-  
-        PaletteKey pk;   
-        pk.typeId = typeId;  
-        for (uint16_t j = 0; j < stateCount; j++) {  
-            BlockStateID sid = read_u8(ifs);  
-            BlockStateID val = read_u8(ifs);  
-            pk.states.push_back({ sid,val });  
-        }  
-          
-        // 读取并反序列化 NBT 数据（版本 4+）  
+    ifs.seekg(header.paletteOffset, std::ios::beg);
+    uint32_t paletteCount = read_u32(ifs);
+    paletteList.reserve(paletteCount);
+    for (uint32_t i = 0; i < paletteCount; i++) {
+        FilePos beforeEntry = ifs.tellg();
+
+        uint32_t pid = read_u32(ifs);
+        BlockTypeID typeId = read_u16(ifs);
+        uint16_t stateCount = read_u16(ifs);
+
+        PaletteKey pk;
+        pk.typeId = typeId;
+        for (uint16_t j = 0; j < stateCount; j++) {
+            BlockStateID sid = read_u8(ifs);
+            BlockStateID val = read_u8(ifs);
+            pk.states.push_back({ sid, val });
+        }
+
+
         if (header.version >= 4) {
             std::string nbtStr = readString32(ifs);
             if (!nbtStr.empty()) {
                 std::istringstream iss(nbtStr);
                 try {
-                    nbt::io::stream_reader reader(iss,endian::little);
+                    nbt::io::stream_reader reader(iss, endian::little);
+                    auto root = reader.read_tag();  // 使用 read_tag 读取完整格式  
 
-                    // 读取完整 root tag
-                    auto root = reader.read_tag();
-
-                    // root 是 pair<string, shared_ptr<tag>>
-                    // 我们期望它是 compound
-                    if (root.second &&
-                        root.second->get_type() == nbt::tag_type::Compound) {
-                        // 将 unique_ptr 转为 shared_ptr
+                    if (root.second && root.second->get_type() == nbt::tag_type::Compound) {
                         pk.nbtData = std::shared_ptr<nbt::tag_compound>(
                             static_cast<nbt::tag_compound*>(root.second.release())
                         );
                     }
                     else {
-                        // 非 compound，直接丢弃
                         pk.nbtData = nullptr;
                     }
                 }
@@ -88,11 +83,7 @@ public:
                     pk.nbtData = nullptr;
                 }
             }
-            else {
-                pk.nbtData = nullptr;
-            }
         }
-          
         paletteList.push_back(pk);  
     }  
   

@@ -22,16 +22,16 @@ public:
         convert();
     }
     void convert() {
-        // 打开文件并读取 NBT 数据(无压缩)  
+        // 打开文件并读取 NBT 数据(无压缩)    
         std::ifstream file(m_filename, std::ios::binary);
         if (!file) {
             throw std::runtime_error("无法打开文件");
         }
-        auto [rootName, structure] = nbt::io::read_compound(file,endian::little);
+        auto [rootName, structure] = nbt::io::read_compound(file, endian::little);
 
         BCFCachedWriter writer(m_outputFilename);
 
-        // 读取尺寸信息  
+        // 读取尺寸信息    
         auto& sizeList = structure->at("size").as<nbt::tag_list>();
         int sizeX = static_cast<int32_t>(sizeList.at(0));
         int sizeY = static_cast<int32_t>(sizeList.at(1));
@@ -39,7 +39,7 @@ public:
         int totalBlocks = sizeX * sizeY * sizeZ;
         int yzSize = sizeY * sizeZ;
 
-        // 访问结构数据  
+        // 访问结构数据    
         auto& structureData = structure->at("structure").as<nbt::tag_compound>();
         auto& blockPalette = structureData.at("palette")
             .as<nbt::tag_compound>()
@@ -52,13 +52,31 @@ public:
             .as<nbt::tag_list>()
             .at(0)
             .as<nbt::tag_list>();
-        // 复制方块索引  
+
+        // 复制方块索引    
         std::vector<int> blockIndices(totalBlocks);
         for (int i = 0; i < totalBlocks; ++i) {
             blockIndices[i] = blockIndicesList[i].as<nbt::tag_int>();
         }
 
-        // 标记空气方块  
+        // 读取 block_position_data (如果存在)  
+        std::unordered_map<int, std::shared_ptr<nbt::tag_compound>> blockEntityMap;
+        auto& paletteCompound = structureData.at("palette").as<nbt::tag_compound>();
+        auto& defaultPalette = paletteCompound.at("default").as<nbt::tag_compound>();
+        if (defaultPalette.has_key("block_position_data")) {
+            auto& blockPosData = defaultPalette.at("block_position_data").as<nbt::tag_compound>();
+            for (const auto& [indexStr, posData] : blockPosData) {
+                int blockIndex = std::stoi(indexStr);
+                auto& posCompound = posData.as<nbt::tag_compound>();
+                if (posCompound.has_key("block_entity_data")) {
+                    blockEntityMap[blockIndex] = std::make_shared<nbt::tag_compound>(
+                        posCompound.at("block_entity_data").as<nbt::tag_compound>()
+                    );
+                }
+            }
+        }
+
+        // 标记空气方块    
         std::vector<bool> isAirPalette(blockPalette.size(), false);
         for (size_t i = 0; i < blockPalette.size(); ++i) {
             auto& paletteEntry = blockPalette.at(i).as<nbt::tag_compound>();
@@ -68,7 +86,7 @@ public:
             }
         }
 
-        // 遍历所有方块  
+        // 遍历所有方块    
         for (int x = 0; x < sizeX; ++x) {
             for (int y = 0; y < sizeY; ++y) {
                 for (int z = 0; z < sizeZ; ++z) {
@@ -83,7 +101,12 @@ public:
                     auto& block = blockPalette.at(paletteIndex).as<nbt::tag_compound>();
                     std::string blockName = static_cast<std::string>(block.at("name"));
 
-                    // 处理方块状态  
+                    // 检查是否有 NBT 数据  
+                    auto nbtIt = blockEntityMap.find(index);
+                    std::shared_ptr<nbt::tag_compound> nbtData =
+                        (nbtIt != blockEntityMap.end()) ? nbtIt->second : nullptr;
+
+                    // 处理方块状态    
                     if (block.has_key("states")) {
                         auto& states = block.at("states").as<nbt::tag_compound>();
                         std::vector<std::pair<std::string, std::string>> statesVec;
@@ -108,10 +131,10 @@ public:
 
                             statesVec.push_back({ stateName, valueStr });
                         }
-                        writer.addBlock(x, y, z, blockName, statesVec);
+                        writer.addBlock(x, y, z, blockName, statesVec, nbtData);
                     }
                     else {
-                        writer.addBlock(x, y, z, blockName, {});
+                        writer.addBlock(x, y, z, blockName, {}, nbtData);
                     }
                 }
             }

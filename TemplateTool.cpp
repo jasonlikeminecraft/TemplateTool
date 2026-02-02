@@ -81,15 +81,23 @@ int main() {
                 std::vector<BlockRegion> blocks = reader.getBlockRegions(i);
 
                 std::cout << "Sub-chunk " << i << " has " << blocks.size() << " regions\n";
-                auto origin = reader.getSubChunkOrigin(i); // 获取子区块的原点
+                auto origin = reader.getSubChunkOrigin(i);
                 std::cout << i << " origin: " << origin.originX << ", " << origin.originY << ", " << origin.originZ << std::endl;
-                //    // 遍历子区块中的所有方块
-                //    for (auto& block : blocks) {
-                //        const PaletteKey& pk = reader.getPaletteKey(block.paletteId);
-                //        std::string blockType = reader.getBlockType(pk.typeId);
-                //        std::cout << "Block type: " << blockType << " (palette id: " << block.paletteId << ")\n";
 
-                //    }
+                // 遍历子区块中的所有方块区域  
+                for (auto& block : blocks) {
+                    const PaletteKey& pk = reader.getPaletteKey(block.paletteId);
+                    std::string blockType = reader.getBlockType(pk.typeId);
+                    std::cout << "Block type: " << blockType << " (palette id: " << block.paletteId << ")\n";
+
+                    // 读取 NBT 数据  
+                    auto nbtData = reader.getBlockNBTData(block.paletteId);
+                    if (nbtData) {
+                        std::cout << "  Has NBT data\n";
+                        // 访问 NBT 数据  
+                        // 例如: if (nbtData->has_key("Items")) { ... }  
+                    }
+                }
             }
             //  std::cin.get();
         }
