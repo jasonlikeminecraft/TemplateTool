@@ -80,6 +80,7 @@ int main() {
             for (size_t i = 0; i < totalSubChunks; i++) {
                  std::vector<BlockRegion> blocks = reader.getBlockRegions(i);
 
+
                 std::cout << "Sub-chunk " << i << " has " << blocks.size() << " regions\n";
             }
             //    auto origin = reader.getSubChunkOrigin(i);
