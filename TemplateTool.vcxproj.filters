@@ -60,42 +60,39 @@
     <ClCompile Include="include\src\value_initializer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="SchematicToBCF.hpp">
+    <ClCompile Include="APP\SchematicToBCF.hpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="block_state_data.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="BlockStateConverter.cpp">
+    <ClCompile Include="core\BlockStateConverter.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="SubChunkUtils.hpp">
+    <ClInclude Include="core\SubChunkUtils.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="bcf_io.hpp">
+    <ClInclude Include="core\bcf_io.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="bcf_structs.hpp">
+    <ClInclude Include="core\bcf_structs.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="BCFCachedWriter.hpp">
+    <ClInclude Include="Writer\BCFCachedWriter.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="BCFStreamReader.hpp">
+    <ClInclude Include="Reader\BCFStreamReader.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="BCFUtils.hpp">
+    <ClInclude Include="core\BCFUtils.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="BlockUtils.hpp">
+    <ClInclude Include="core\BlockUtils.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="RegionMergeUtils.hpp">
+    <ClInclude Include="core\RegionMergeUtils.hpp">
       <Filter>头文件\BCKFile</Filter>
     </ClInclude>
-    <ClInclude Include="McstructureToBCF.hpp">
+    <ClInclude Include="APP\McstructureToBCF.hpp">
       <Filter>头文件\ToMCF</Filter>
     </ClInclude>
     <ClInclude Include="include\io\izlibstream.h">
@@ -236,26 +233,26 @@
     <ClInclude Include="include\nbt_export.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="LitematicToBCF.hpp">
+    <ClInclude Include="APP\LitematicToBCF.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="SchemToBCF.hpp">
+    <ClInclude Include="APP\SchemToBCF.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="BlockStateConverter.hpp">
+    <ClInclude Include="core\BlockStateConverter.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="McfunctionToBCF.hpp">
+    <ClInclude Include="APP\McfunctionToBCF.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="BCFBlockMerger.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="block_state_data.hpp">
+    <ClInclude Include="APP\BCFBlockMerger.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="snbt_convert.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
   </ItemGroup>
 </Project>

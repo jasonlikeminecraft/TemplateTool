@@ -77,7 +77,7 @@
     <ExternalIncludePath>D:\Projects\TemplateTool\include;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\Projects\TemplateTool\include;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Projects\TemplateTool;D:\Projects\TemplateTool\include;$(IncludePath)</IncludePath>
     <ExternalIncludePath>D:\Projects\TemplateTool\include;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -149,8 +149,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="BlockStateConverter.cpp" />
-    <ClCompile Include="block_state_data.cpp" />
+    <ClCompile Include="core\BlockStateConverter.cpp" />
     <ClCompile Include="include\src\endian_str.cpp" />
     <ClCompile Include="include\src\io\izlibstream.cpp" />
     <ClCompile Include="include\src\io\ozlibstream.cpp" />
@@ -163,20 +162,19 @@
     <ClCompile Include="include\src\text\json_formatter.cpp" />
     <ClCompile Include="include\src\value.cpp" />
     <ClCompile Include="include\src\value_initializer.cpp" />
-    <ClCompile Include="SchematicToBCF.hpp" />
+    <ClCompile Include="APP\SchematicToBCF.hpp" />
     <ClCompile Include="TemplateTool.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BCFBlockMerger.hpp" />
-    <ClInclude Include="block_state_data.hpp" />
-    <ClInclude Include="McfunctionToBCF.hpp" />
-    <ClInclude Include="BlockStateConverter.hpp" />
-    <ClInclude Include="BCFCachedWriter.hpp" />
-    <ClInclude Include="BCFStreamReader.hpp" />
-    <ClInclude Include="BCFUtils.hpp" />
-    <ClInclude Include="bcf_io.hpp" />
-    <ClInclude Include="bcf_structs.hpp" />
-    <ClInclude Include="BlockUtils.hpp" />
+    <ClInclude Include="APP\BCFBlockMerger.hpp" />
+    <ClInclude Include="APP\McfunctionToBCF.hpp" />
+    <ClInclude Include="core\BlockStateConverter.hpp" />
+    <ClInclude Include="Writer\BCFCachedWriter.hpp" />
+    <ClInclude Include="Reader\BCFStreamReader.hpp" />
+    <ClInclude Include="core\BCFUtils.hpp" />
+    <ClInclude Include="core\bcf_io.hpp" />
+    <ClInclude Include="core\bcf_structs.hpp" />
+    <ClInclude Include="core\BlockUtils.hpp" />
     <ClInclude Include="include\crtp_tag.h" />
     <ClInclude Include="include\endian_str.h" />
     <ClInclude Include="include\io\izlibstream.h" />
@@ -223,14 +221,17 @@
     <ClInclude Include="include\text\json_formatter.h" />
     <ClInclude Include="include\value.h" />
     <ClInclude Include="include\value_initializer.h" />
-    <ClInclude Include="LitematicToBCF.hpp" />
-    <ClInclude Include="McstructureToBCF.hpp" />
-    <ClInclude Include="RegionMergeUtils.hpp" />
-    <ClInclude Include="SchemToBCF.hpp" />
-    <ClInclude Include="SubChunkUtils.hpp" />
+    <ClInclude Include="APP\LitematicToBCF.hpp" />
+    <ClInclude Include="APP\McstructureToBCF.hpp" />
+    <ClInclude Include="core\RegionMergeUtils.hpp" />
+    <ClInclude Include="APP\SchemToBCF.hpp" />
+    <ClInclude Include="core\SubChunkUtils.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="snbt_convert.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

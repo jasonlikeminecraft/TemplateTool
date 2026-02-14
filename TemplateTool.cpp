@@ -1,13 +1,13 @@
 ﻿#include <iostream>
-#include <chrono>  // 添加计时功能的头文件
-#include "BCFCachedWriter.hpp"
-#include "BCFStreamReader.hpp"
-#include "McstructureToBCF.hpp"
-#include "SchematicToBCF.hpp"
-#include "LitematicToBCF.hpp"
-#include "SchemToBCF.hpp"
-#include "McfunctionToBCF.hpp"
-#include "BCFBlockMerger.hpp"
+#include <chrono> 
+#include "Writer/BCFCachedWriter.hpp"
+#include "Reader/BCFStreamReader.hpp"
+#include "APP/McstructureToBCF.hpp"
+#include "APP/SchematicToBCF.hpp"
+#include "APP/LitematicToBCF.hpp"
+#include "APP/SchemToBCF.hpp"
+#include "APP/McfunctionToBCF.hpp"
+#include "APP/BCFBlockMerger.hpp"
 #include <nbt_tags.h>
 #include <io/stream_reader.h>
 #include <io/izlibstream.h>
@@ -66,7 +66,7 @@ int main() {
             }
 
             auto end = std::chrono::high_resolution_clock::now();  // 记录结束时间
-            std::chrono::duration<double> elapsed = end - start;  // 计算转换所用时间
+            std::chrono::duration<double> elapsed = end - start; 
 
             std::cout << "转换时间: " << elapsed.count() << " 秒" << std::endl;
 
@@ -78,27 +78,28 @@ int main() {
 
             //// 按需读取指定的子区块  
             for (size_t i = 0; i < totalSubChunks; i++) {
-                std::vector<BlockRegion> blocks = reader.getBlockRegions(i);
+                 std::vector<BlockRegion> blocks = reader.getBlockRegions(i);
 
                 std::cout << "Sub-chunk " << i << " has " << blocks.size() << " regions\n";
-                auto origin = reader.getSubChunkOrigin(i);
-                std::cout << i << " origin: " << origin.originX << ", " << origin.originY << ", " << origin.originZ << std::endl;
-
-                // 遍历子区块中的所有方块区域  
-                for (auto& block : blocks) {
-                    const PaletteKey& pk = reader.getPaletteKey(block.paletteId);
-                    std::string blockType = reader.getBlockType(pk.typeId);
-                    std::cout << "Block type: " << blockType << " (palette id: " << block.paletteId << ")\n";
-
-                    // 读取 NBT 数据  
-                    auto nbtData = reader.getBlockNBTData(block.paletteId);
-                    if (nbtData) {
-                        std::cout << "  Has NBT data\n";
-                        // 访问 NBT 数据  
-                        // 例如: if (nbtData->has_key("Items")) { ... }  
-                    }
-                }
             }
+            //    auto origin = reader.getSubChunkOrigin(i);
+            //    std::cout << i << " origin: " << origin.originX << ", " << origin.originY << ", " << origin.originZ << std::endl;
+
+            //    // 遍历子区块中的所有方块区域  
+            //    for (auto& block : blocks) {
+            //        const PaletteKey& pk = reader.getPaletteKey(block.paletteId);
+            //        std::string blockType = reader.getBlockType(pk.typeId);
+            //        std::cout << "Block type: " << blockType << " (palette id: " << block.paletteId << ")\n";
+
+            //        // 读取 NBT 数据  
+            //        auto nbtData = reader.getBlockNBTData(block.paletteId);
+            //        if (nbtData) {
+            //            std::cout << "  Has NBT data\n";
+            //            // 访问 NBT 数据  
+            //            // 例如: if (nbtData->has_key("Items")) { ... }  
+            //        }
+            //    }
+            //}
             //  std::cin.get();
         }
     }
